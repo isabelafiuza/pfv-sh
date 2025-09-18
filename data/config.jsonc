@@ -1,0 +1,22 @@
+{
+    // Modo de execucao do modelo: train | predict    
+    "mode": "predict",
+
+    // Caminho para a leitura dos dados de entrada 
+    "input": "./data",
+
+    // Caminho para a escrita dos dados de saida 
+    "output": "./out",
+
+    // Caminho para obtencao do artefato do modelo treinado 
+    "artifact": ".",
+
+    // Vetor dos ids de usinas a serem consideradas no processo; vazio usa todas 
+    "ids_usinas": [],
+
+    // Vetor contendo o nome dos modelos meteorologicos a serem considerados no processo de previsao
+    "modelos_meteorologicos": ["GFS"],
+
+    // Vetor contendo o nome dos modelos de previsao de geracao a serem considerados no processo de previsao
+    "modelos_previsao": ["Arimax","FisicoEstimado"]
+}
