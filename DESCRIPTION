@@ -1,0 +1,27 @@
+Package: previsaofotovoltaica
+Title: Modelo de previsao de geracao solar fotovoltaica
+Version: 0.0.0.9000
+Authors@R: 
+    person("Isabela", "Fiuza", , "isabela.fiuza@ons.org.br", role = c("aut", "cre"))
+Description: Este pacote contem as funcionalidades necessarias para criacao de previsoes de geracao 
+    fotovoltaica.
+License: MIT + file LICENSE
+Depends:
+    R (>= 4.0),
+    stats (>= 4.0),
+    utils (>= 4.0)
+Imports: 
+    data.table (>= 1.17.0),
+    argparse (>= 2.2.5),
+    lgr (>= 0.4.4),
+    lubridate (>= 1.9.4),
+    pfvIO (>= 0.2)
+Suggests: 
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
+Encoding: UTF-8
+LazyData: true
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2
+Remotes:
+    lkhenayfis/pfvIO
