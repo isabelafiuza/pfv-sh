@@ -11,7 +11,9 @@
 parse_config <- function(config, conn) {
     valida_nomes_config(config)
     valida_tipos_config(config)
+    config$data_referencia <- parsearg_data_referencia(config$data_referencia)
     config$ids_usinas <- parsearg_ids_usinas(config$ids_usinas, conn)
+    config$horizonte_dias <- parsearg_horizonte_dias(config$horizonte_dias)
     return(config)
 }
 
@@ -42,7 +44,7 @@ valida_nomes_config <- function(config) {
 
 config_names <- function() {
     c("mode", "input", "output", "artifact", "ids_usinas",
-        "modelos_meteorologicos", "modelos_previsao")
+        "modelos_NWP", "modelos_previsao")
 }
 
 #' Valida Tipos Das Chaves Do Arquivo De Configuracao
@@ -73,7 +75,7 @@ valida_tipos_config <- function(config) {
 config_types <- function() {
     structure(
         list("character", "character", "character", "character", list("character", "NULL"), 
-        "character", "character"),
+        "character", "list"),
         names = config_names())
 }
 
@@ -103,6 +105,32 @@ valid_tipos <- function(l, tipos) do.call(all, list(sapply(l, valid_tipos_unit, 
 
 valid_tipos_unit <- function(x, tipos) Reduce("|", lapply(tipos, inherits, x = x))
 
+# PARSERS ------------------------------------------------------------------------------------------
+
+#' Interpretador De Chave `data_referencia`
+#' 
+#' Funcao interna de [`parse_config`] para interpretar o parametro `data_referencia` da configuracao
+#' 
+#' @param x valor da chave `data_referencia`; numerico ou vetor de duas strings de data
+#' 
+#' @return vetor `Date` de duas posicoes indicando inicio e fim da janela de simulacao
+
+parsearg_data_referencia <- function(x) UseMethod("parsearg_data_referencia")
+
+#' @rdname parsearg_data_referencia
+
+parsearg_data_referencia.numeric <- function(x) Sys.Date() - c(x + 1, 1)
+
+#' @rdname parsearg_data_referencia
+
+parsearg_data_referencia.character <- function(x) as.Date(x)
+
+#' @rdname parsearg_data_referencia
+
+parsearg_data_referencia.list <- function(x) {
+    lapply(data_referencia, function(x) parsearg_data_referencia(x))
+}
+
 #' Interpretador De Chave `ids_usinas`
 #' 
 #' Funcao interna de [`parse_config`] para interpretar o parametro `ids_usinas` da configuracao
@@ -115,5 +143,20 @@ valid_tipos_unit <- function(x, tipos) Reduce("|", lapply(tipos, inherits, x = x
 
 parsearg_ids_usinas <- function(x, conn) {
     if (length(x) == 0) x <- get_usinas(conn)$id_usina else x <- unlist(x)
+    return(x)
+}
+
+#' Interpretador De Chave `horizonte_dias`
+#' 
+#' Funcao interna de [`parse_config`] para interpretar o parametro `horizonte_dias` da configuracao
+#' 
+#' @param x valor da chave `horizonte_dias`; lista vazia ou de codigos de usinas
+#' @param conn objeto de conexao com um banco
+#' 
+#' @return se `x` era uma lista vazia, retorna um vetor com todos os ids no banco `conn`; do 
+#'     contrario retorna `x` vetorizado
+
+parsearg_horizonte_dias <- function(x) {
+    x <- unlist(x)
     return(x)
 }
