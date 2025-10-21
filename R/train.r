@@ -1,4 +1,4 @@
-train_main <- function(args){
+train_main <- function(args){ # EM DESENVOLVIMENTO - NAO ESTA FUNCIONANDO
     conn <- conectamock_pfv(args$input)
     v_usinas <- args$ids_usinas
     v_horizonte <- args$horizonte_dias
@@ -6,8 +6,6 @@ train_main <- function(args){
     dt_usinas <- get_usinas(conn, id_usina = v_usinas)
 
     data_set <- get_dataset(args, conn, dias = 180)
-
-
 
     data_set$irrad_prev <- associa_nwp_usina(dt_usinas = dt_usinas, dt_prev = data_set$irrad_prev)
     data_set$irrad_prev <- interpola_previsao_nwp(data_set = data_set$irrad_prev)
@@ -17,28 +15,40 @@ train_main <- function(args){
     #modelo <- mapply(train_fisico_estimado, v_usinas, v_horizonte, data_set)
 }
 
-train_fisico_estimado <- function(usina, horizonte, data_set){
+train_fisico_estimado <- function(data_set){
 
-    dt_geracao_observada <- data_set$ger_obs[id_usina == usina]
-    dt_geracao_observada <- dt_geracao_observada[, semi_hora := format(data_hora_observacao, "%H:%M")]
-    dt_geracao_observada[valor == 999, valor := NA]
+    data_set <- lapply(data_set, function(x) x[valor == 0, valor := NA])
+    data_set <- mapply(renomeia_colunas, data_set, "data_hora_observacao", "data_hora")
+    data_set <- mapply(renomeia_colunas, data_set, "data_hora_previsao", "data_hora")
+    data_set <- lapply(data_set, function(x) x[, hora := format(data_hora, "%H:%M")])
+    vetor_horas <- unique(data_set$ger_obs$hora) # DEPOIS SUBSTITUIR PELO PERIODO DE GERACAO IDENTIFICADO PARA CADA USINA
 
-    dt_irradiancia_prevista <- data_set$irrad_prev[id_usina == usina & passo_prev == horizonte]
-    dt_irradiancia_prevista <- dt_irradiancia_prevista[, semi_hora := format(data_hora_previsao, "%H:%M")]
-    dt_irradiancia_prevista[valor == 999, valor := NA]
+    for (h in vetor_horas){
+
+        list_y <- data_set[names(data_set) == "ger_obs"]
+        list_x <- data_set[names(data_set) != "ger_obs"]
+
+        list_y <- lapply(list_y, function(x) x[hora == h])
+        list_x <- lapply(list_x, function(x) x[hora == h])
+
+        dt_y <- as.data.table(sapply(list_y, function(x) x$valor))
+        dt_x <- as.data.table(sapply(list_x, function(x) x$valor))
+
+        modelo <- aplica_regressao_linear(dt_y, dt_x)
+    }
+}
+
+aplica_regressao_linear <- function(dt_y, dt_x){
+
+    dados <- cbind(dt_y, dt_x)    
+    resposta <- names(dt_y)
+    preditoras <- names(dt_x)
+
+    formula <- paste(resposta, "~", paste(preditoras, collapse = "+" ))
+    formula_objeto <- as.formula(formula)
     
-    semi_hora <- dt_geracao_observada$semi_hora
-    semi_hora <- semi_hora[!duplicated(semi_hora)]
-    
-    for(sh in semi_hora){
-        dt_geracao_observada_sh <- dt_geracao_observada[semi_hora == sh]
-        dt_irradiancia_prevista_sh <- dt_irradiancia_prevista[semi_hora == sh]
-
-        x <- dt_irradiancia_prevista_sh$valor
-        y <- dt_geracao_observada_sh$valor
-
-        modelo <- lm(y ~ x)  
-    }    
+    modelo <- lm(formula_objeto, data = dados)
+    return(modelo)
 }
 
 # AUXILIARES ---------------------------------------------------------------------------------------
@@ -65,13 +75,13 @@ get_dataset <- function(args, conn, dias){
     return(out)
 }
 
-preenche_lacunas_previsao <- function(data_set){
+preenche_lacunas_previsao <- function(data_set){ # EM DESENVOLVIMENTO - NAO ESTA FUNCIONANDO
 
     datas_rodadas <- unique(data_set$data_hora_rodada)
 
 }
 
-compatibiliza_datas <- function(data_set){
+compatibiliza_datas <- function(data_set){ # EM DESENVOLVIMENTO - NAO ESTA FUNCIONANDO
 
     ger_obs <- data_set$ger_obs  
     ger_obs_colorder <- names(ger_obs)
@@ -96,4 +106,9 @@ compatibiliza_datas <- function(data_set){
     data_set$irrad_prev <- irrad_prev
 
     return(data_set)
+}
+
+renomeia_colunas <- function(dt, nome_atual, nome_novo){
+    names(dt)[names(dt) == nome_atual] <- nome_novo
+    return(dt)
 }
