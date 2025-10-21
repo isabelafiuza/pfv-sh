@@ -15,6 +15,16 @@ train_main <- function(args){ # EM DESENVOLVIMENTO - NAO ESTA FUNCIONANDO
     #modelo <- mapply(train_fisico_estimado, v_usinas, v_horizonte, data_set)
 }
 
+#' Treinamento Usando O Metodo Fisico Estimado
+#'
+#' Realiza treinamento do modelo fisico estimado e salva modelo para uso futuro
+#' 
+#' @param data_set lista contendo o subset dos dados utilizados para treinamento do modelo.
+#' O subset ja deve conter os dados do periodo adequado para o treinamento. Cada item da lista 
+#' corresponde a uma variavel usada no treinamento, tanto variavel resposta quanto explicativas.
+#' 
+#' @return modelos ajustados
+#' 
 train_fisico_estimado <- function(data_set){
 
     data_set <- lapply(data_set, function(x) x[valor == 0, valor := NA])
@@ -38,6 +48,16 @@ train_fisico_estimado <- function(data_set){
     }
 }
 
+#' Aplica Regressao Linear
+#'
+#' Funcao que aplica regressao linear a um conjunto de dados e salva o 
+#' 
+#' @param dt_y ´data.table´ contendo a variavel resposta. Exemplo: geracao observada
+#' @param dt_x ´data.table´ contendo a(s) variavel(is) explicativas. Exemplo: irradiancia, umidade e temperatura
+#' As observacoes contidas nos data.tables contendo as variaveis ja devem estar em posicoes compativeis
+#' 
+#' @return modelos ajustados
+#' 
 aplica_regressao_linear <- function(dt_y, dt_x){
 
     dados <- cbind(dt_y, dt_x)    
