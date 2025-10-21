@@ -7,7 +7,13 @@ train_main <- function(args){
 
     data_set <- get_dataset(args, conn, dias = 180)
 
-
+    artefatos <- lapply(v_usinas, treina_usina,
+        dt_usinas = dt_usinas,
+        dt_ger_obs = data_set$ger_obs,
+        dt_irrad_prev = data_set$irrad_prev,
+        fator_tolerancia_geracao = args$fator_tolerancia_limite_inferior_geracao,
+        fator_tolerancia_horas = args$percentual_dias_geracao
+    )
 
     data_set$irrad_prev <- associa_nwp_usina(dt_usinas = dt_usinas, dt_prev = data_set$irrad_prev)
     data_set$irrad_prev <- interpola_previsao_nwp(data_set = data_set$irrad_prev)
@@ -15,6 +21,18 @@ train_main <- function(args){
     data_set$irrad_prev <- compatibiliza_datas(data_set)
 
     #modelo <- mapply(train_fisico_estimado, v_usinas, v_horizonte, data_set)
+}
+
+treina_usina <- function(
+    iu, dt_usinas, dt_ger_obs, dt_irrad_prev,
+    fator_tolerancia_geracao, fator_tolerancia_horas) {
+   # Filtra os dados referentes a usina atual
+    dad_usi <- dt_usinas[id_usina == iu]
+    ger_usi <- dt_ger_obs[id_usina == iu]
+
+    # identificacao das semi-horas com geracao solar
+    periodo_ger <- identifica_periodo_ger(dad_usi, ger_usi, fator_tolerancia_geracao, fator_tolerancia_horas)
+
 }
 
 train_fisico_estimado <- function(usina, horizonte, data_set){
@@ -40,6 +58,8 @@ train_fisico_estimado <- function(usina, horizonte, data_set){
         modelo <- lm(y ~ x)  
     }    
 }
+
+
 
 # AUXILIARES ---------------------------------------------------------------------------------------
 
@@ -97,3 +117,4 @@ compatibiliza_datas <- function(data_set){
 
     return(data_set)
 }
+

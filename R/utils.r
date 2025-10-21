@@ -119,3 +119,68 @@ intepola_serie_temporal <- function(dt){
     dt_interpolado <- na.approx(dt)
     return(dt_interpolado)
 } 
+
+#' Identifica periodo do dia com geracao solar
+#' 
+#' @description
+#' A funcao identifica horarios ("HH:MM") em que ha geracao
+#' ao longo de um ano.
+#' Util para definir periodo em que havera treinamento de modelos
+#' e previsao de geracao solar
+#' 
+#' @param dad_usina data.table contendo pelo menos:
+#' \itemize {
+#' \item id_usina
+#' \item potencia instalada
+#' }
+#' @param ger_usina data.table contendo pelo menos:
+#' \itemize {
+#' \item data_hora_observacao
+#' \item valor
+#' }
+#' @param fator_tol_ger
+#' fator minimo da capacidade instalada da usina para considerar 
+#' que houve geracao
+#' @param janela_dias
+#' numero de dias passados a considerar na analise
+#' @param fator_tol_horas
+#' fator minimo dos dias analisados com geracao
+#' 
+#' @return 
+#' vetor de characteres com as meias-horas ("HH:MM")
+#' 
+#' @details 
+#' A funcao segue as etapas:
+#' \itemize {
+#'   \item extrai a meia-hora, hora_min, de cada observacao
+#'   \item seleciona os dias para analise
+#'   \item para cada meia-hora, conta o numero de dias com geracao superior ao limiar estabelecido
+#'   \item retorna as meias-horas com geracao em pelo menos `fator_tol_dias*janela_dias` dias.
+#' }
+
+identifica_periodo_ger <- function(dad_usina, ger_usi, fator_tol_ger, fator_tol_horas) {
+  
+  janela_dias <- 300
+  dt <- copy(ger_usi)
+  
+  dt[, hora_min := format(data_hora_observacao, "%H:%M")]
+  dt[, data := as.Date(data_hora_observacao)]
+  
+  # considerar apenas as ultimas `janela_dias` datas
+  ultimas_datas <- head(sort(unique(dt$data), decreasing = TRUE), janela_dias)
+  dt <- dt[data %in% ultimas_datas]
+  
+  # contar em quantos dias houve geracao acima do limiar para cada hora:minuto
+  resumo <- dt[
+    valor > fator_tol_ger * dad_usi$capacidade_instalada_MW,
+    .(dias_com_geracao = uniqueN(data)),
+    by = hora_min
+  ]
+  
+  dias_minimos <- fator_tol_horas * length(ultimas_datas)
+  horas_validas <- resumo[dias_com_geracao >= dias_minimos, hora_min]
+  
+  horas_validas <- sort(horas_validas)
+  
+  return(horas_validas)
+}
