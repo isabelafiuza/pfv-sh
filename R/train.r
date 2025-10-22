@@ -1,4 +1,4 @@
-train_main <- function(args){ # EM DESENVOLVIMENTO - NAO ESTA FUNCIONANDO
+train_main <- function(args){ # ISABELA - EM DESENVOLVIMENTO - NAO ESTA FUNCIONANDO
     conn <- conectamock_pfv(args$input)
     v_usinas <- args$ids_usinas
     v_horizonte <- args$horizonte_dias
@@ -7,12 +7,11 @@ train_main <- function(args){ # EM DESENVOLVIMENTO - NAO ESTA FUNCIONANDO
 
     data_set <- get_dataset(args, conn, dias = 180)
 
-    data_set$irrad_prev <- associa_nwp_usina(dt_usinas = dt_usinas, dt_prev = data_set$irrad_prev)
+    data_set$irrad_prev <- associa_nwp_usina(dt_usinas = dt_usinas, dt_prev = data_set[names(data_set) != "ger_obs"])
     data_set$irrad_prev <- interpola_previsao_nwp(data_set = data_set$irrad_prev)
     data_set$irrad_prev <- adicionar_passo_previsao(dt_prev = data_set$irrad_prev)
     data_set$irrad_prev <- compatibiliza_datas(data_set)
 
-    #modelo <- mapply(train_fisico_estimado, v_usinas, v_horizonte, data_set)
 }
 
 #' Treinamento Usando O Metodo Fisico Estimado
@@ -31,11 +30,12 @@ train_fisico_estimado <- function(data_set){
     data_set <- mapply(renomeia_colunas, data_set, "data_hora_observacao", "data_hora")
     data_set <- mapply(renomeia_colunas, data_set, "data_hora_previsao", "data_hora")
     data_set <- lapply(data_set, function(x) x[, hora := format(data_hora, "%H:%M")])
-    vetor_horas <- unique(data_set$ger_obs$hora) # DEPOIS SUBSTITUIR PELO PERIODO DE GERACAO IDENTIFICADO PARA CADA USINA
+    vetor_horas <- unique(data_set$ger_obs$hora) # ISABELA - DEPOIS SUBSTITUIR PELO PERIODO DE GERACAO IDENTIFICADO PARA CADA USINA
+   
 
     for (h in vetor_horas){
 
-        list_y <- data_set[names(data_set) == "ger_obs"]
+        list_y <- data_set[names(data_set) == "ger_obs"] # ISABELA - VERIFICAR SE TEM FORMA MELHOR DE FAZER
         list_x <- data_set[names(data_set) != "ger_obs"]
 
         list_y <- lapply(list_y, function(x) x[hora == h])
@@ -95,13 +95,13 @@ get_dataset <- function(args, conn, dias){
     return(out)
 }
 
-preenche_lacunas_previsao <- function(data_set){ # EM DESENVOLVIMENTO - NAO ESTA FUNCIONANDO
+preenche_lacunas_previsao <- function(data_set){ # ISABELA - EM DESENVOLVIMENTO - NAO ESTA FUNCIONANDO
 
     datas_rodadas <- unique(data_set$data_hora_rodada)
 
 }
 
-compatibiliza_datas <- function(data_set){ # EM DESENVOLVIMENTO - NAO ESTA FUNCIONANDO
+compatibiliza_datas <- function(data_set){ # ISABELA - EM DESENVOLVIMENTO - NAO ESTA FUNCIONANDO
 
     ger_obs <- data_set$ger_obs  
     ger_obs_colorder <- names(ger_obs)
