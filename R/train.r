@@ -2,6 +2,7 @@ train_main <- function(args){ # ISABELA - EM DESENVOLVIMENTO - NAO ESTA FUNCIONA
     conn <- conectamock_pfv(args$input)
     v_usinas <- args$ids_usinas
     v_horizonte <- args$horizonte_dias
+    v_modelos_nwp <- args$modelos_NWP
 
     dt_usinas <- get_usinas(conn, id_usina = v_usinas)
 
@@ -69,6 +70,23 @@ aplica_regressao_linear <- function(dt_y, dt_x){
     
     modelo <- lm(formula_objeto, data = dados)
     return(modelo)
+}
+
+train_arima <- function(pars, ger_usi, irr_usi, janela_dias) {
+
+    ger_usi_filt <- copy(ger_usi)
+    irr_usi_filt <- copy(irr_usi)
+
+    ger_usi_filt <- ger_usi_filt[hora_min == pars$hora_min]
+    
+    irr_usi_filt <- irr_usi_filt[
+            id_modelo_nwp == pars$id_modelo_nwp &
+            passo_prev == pars$horiz_prev &
+            hora_min == pars$hora_min
+        ]
+
+    # comeca auto.arima
+
 }
 
 # AUXILIARES ---------------------------------------------------------------------------------------

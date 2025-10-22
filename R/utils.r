@@ -119,3 +119,137 @@ intepola_serie_temporal <- function(dt){
     dt_interpolado <- na.approx(dt)
     return(dt_interpolado)
 } 
+
+#' Identifica periodo do dia com geracao solar
+#' 
+#' @description
+#' A funcao identifica horarios ("HH:MM") em que ha geracao
+#' ao longo de um ano.
+#' Util para definir periodo em que havera treinamento de modelos
+#' e previsao de geracao solar
+#' 
+#' @param dad_usina data.table contendo pelo menos:
+#' \itemize {
+#' \item id_usina
+#' \item potencia instalada
+#' }
+#' @param ger_usina data.table contendo pelo menos:
+#' \itemize {
+#' \item data_hora_observacao
+#' \item valor
+#' }
+#' @param fator_tol_ger
+#' fator minimo da capacidade instalada da usina para considerar 
+#' que houve geracao
+#' @param janela_dias
+#' numero de dias passados a considerar na analise
+#' @param fator_tol_horas
+#' fator minimo dos dias analisados com geracao
+#' 
+#' @return 
+#' vetor de characteres com as meias-horas ("HH:MM")
+#' 
+#' @details 
+#' A funcao segue as etapas:
+#' \itemize {
+#'   \item extrai a meia-hora, hora_min, de cada observacao
+#'   \item seleciona os dias para analise
+#'   \item para cada meia-hora, conta o numero de dias com geracao superior ao limiar estabelecido
+#'   \item retorna as meias-horas com geracao em pelo menos `fator_tol_dias*janela_dias` dias.
+#' }
+
+identifica_periodo_ger <- function(dad_usina, ger_usi, fator_tol_ger, fator_tol_horas) {
+  
+  janela_dias <- 300
+  dt <- copy(ger_usi)
+  
+  dt[, hora_min := format(data_hora_observacao, "%H:%M")]
+  dt[, data := as.Date(data_hora_observacao)]
+  
+  # considerar apenas as ultimas `janela_dias` datas
+  ultimas_datas <- head(sort(unique(dt$data), decreasing = TRUE), janela_dias)
+  dt <- dt[data %in% ultimas_datas]
+  
+  # contar em quantos dias houve geracao acima do limiar para cada hora:minuto
+  resumo <- dt[
+    valor > fator_tol_ger * dad_usi$capacidade_instalada_MW,
+    .(dias_com_geracao = uniqueN(data)),
+    by = hora_min
+  ]
+  
+  dias_minimos <- fator_tol_horas * length(ultimas_datas)
+  horas_validas <- resumo[dias_com_geracao >= dias_minimos, hora_min]
+  
+  horas_validas <- sort(horas_validas)
+  
+  return(horas_validas)
+}
+
+#' Gera combinacoes entre nwp, passo de previsao e meia-hora
+#' 
+#' @description 
+#' Cria uma lista com todas as combinacoes possiveis entre modelos meteorologicos, 
+#' passos de previsao e meias-horas
+#' 
+#' @param v_modelos_nwp vetor com os nomes dos modelos meteorologicos, ex: c("GFS")
+#' @param v_horizonte vetor de caracteres com os passos de previsao, ex: c("D+0", "D+1")
+#' @param periodo_ger vetor de horarios no formato HH:MM, ex: c("12:00", "12:30")
+#'
+#' @return lista com as colunas:
+#' \itemize {
+#' \item id_modelo_nwp - modelo meteorologico
+#' \item horiz_prev - passo de previsao
+#' \item periodo_ger - meias-horas com geracao solar
+#' }
+#' 
+#' @examples 
+#' v_nwp <- c("GFS", "ECMWF")
+#' v_horiz <- c("D+0", "D+1")
+#' v_hor_ger <- c("12:00", "12:30")
+#' gera_combinacoes_modelo(v_nwp, v_horiz, v_hor_ger)
+
+gera_combinacoes_modelo <- function(v_modelos_nwp, v_horizonte, periodo_ger) {
+    comb <- CJ(
+        id_modelo_nwp = unlist(v_modelos_nwp),
+        horiz_prev = v_horizonte,
+        hora_min = periodo_ger
+        )
+
+    lista_comb <- split(comb, seq_len(nrow(comb)))
+    lista_comb <- lapply(lista_comb, as.list)
+
+    return(lista_comb)
+}
+
+#' Filtra dados meteorologicos para cada combinacao nwp x passo de previsao x meia-hora
+#' 
+#' @description
+#' Para cada trio modelo meteorologico x passo de previsao x meias-horas,
+#' e filtrado o conjunto de dados de interesse do data.table original
+#' 
+#' @param irr_usi `data.table` pelo menos com as colunas:
+#' \itemize id_modelo_nwp - modelo meteorologico
+#' \item horiz_prev - passo de previsao
+#' \item hora_min - meias-horas com geracao solar (formato HH:MM)
+#' \item valor - irradiancia observada
+#' 
+#' @param list_comb lista de listas, em que cada elemento contem:
+#' \itemize {
+#'   \item id_modelo_nwp
+#'   \item horiz_prev
+#'   \item hora_min
+#' }
+#' 
+#' @return `data.table` com os dados meteorologicos filtrados
+
+filtra_dado_por_combinacao <- function(irr_usi, list_comb) {
+    irr_usi_filt = copy(irr_usi)
+    
+    lapply(list_comb, function(pars) {
+        irr_usi_filt[
+            id_modelo_nwp == pars$id_modelo_nwp &
+            passo_prev == pars$horiz_prev &
+            hora_min == pars$hora_min
+        ]
+    })
+}

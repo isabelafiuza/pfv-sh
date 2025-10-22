@@ -39,5 +39,16 @@
         "fisico_estimado": {
             "tipo": "fisico_estimado"
         }
-    }
+    },
+
+    // Fator de tolerancia superior para eliminacao de dados invalidos de geracao, multiplicado pela 
+    // capacidade instalada da usina
+    "fator_tolerancia_limite_superior_geracao": 1.1,
+
+    // Fator de tolerancia inferior para considerar geracao semi-horaria significativa, 
+    // multiplicado pela capacidade instalada da usina
+    "fator_tolerancia_limite_inferior_geracao": 0.01,
+
+    // Percentual minimo de dias com geracao acima do limite para considerar como semi-hora com geracao
+    "percentual_dias_geracao": 0.9
 }
