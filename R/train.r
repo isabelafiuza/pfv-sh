@@ -2,10 +2,19 @@ train_main <- function(args){
     conn <- conectamock_pfv(args$input)
     v_usinas <- args$ids_usinas
     v_horizonte <- args$horizonte_dias
+    v_modelos_nwp <- args$modelos_NWP
 
     dt_usinas <- get_usinas(conn, id_usina = v_usinas)
 
     data_set <- get_dataset(args, conn, dias = 180)
+
+    data_set$irrad_prev <- associa_nwp_usina(dt_usinas = dt_usinas, dt_prev = data_set$irrad_prev)
+
+    # FUNCAO QUE CHECA SE NAO HA SALTO ENTRE AS DATAS DE PREVISAO
+
+    data_set$irrad_prev <- interpola_previsao_nwp(data_set = data_set$irrad_prev) 
+    data_set$irrad_prev <- adicionar_passo_previsao(dt_prev = data_set$irrad_prev)
+    #data_set$irrad_prev <- compatibiliza_datas(data_set)
 
     artefatos <- lapply(v_usinas, treina_usina,
         dt_usinas = dt_usinas,
@@ -15,12 +24,7 @@ train_main <- function(args){
         fator_tolerancia_horas = args$percentual_dias_geracao
     )
 
-    data_set$irrad_prev <- associa_nwp_usina(dt_usinas = dt_usinas, dt_prev = data_set$irrad_prev)
-    data_set$irrad_prev <- interpola_previsao_nwp(data_set = data_set$irrad_prev)
-    data_set$irrad_prev <- adicionar_passo_previsao(dt_prev = data_set$irrad_prev)
-    data_set$irrad_prev <- compatibiliza_datas(data_set)
-
-    #modelo <- mapply(train_fisico_estimado, v_usinas, v_horizonte, data_set)
+    
 }
 
 treina_usina <- function(
@@ -29,10 +33,20 @@ treina_usina <- function(
    # Filtra os dados referentes a usina atual
     dad_usi <- dt_usinas[id_usina == iu]
     ger_usi <- dt_ger_obs[id_usina == iu]
+    irr_usi <- dt_irrad_prev[id_usina == iu]
+
+    ger_usi[, hora_min := format(data_hora_observacao, "%H:%M")] 
+    irr_usi[, hora_min := format(data_hora_previsao, "%H:%M")] 
 
     # identificacao das semi-horas com geracao solar
     periodo_ger <- identifica_periodo_ger(dad_usi, ger_usi, fator_tolerancia_geracao, fator_tolerancia_horas)
+    
+    # gera lista com as combinacoes nwp x passo de previsao x meia-hora
+    list_comb <- gera_combinacoes_modelo(v_modelos_nwp, v_horizonte, periodo_ger)
 
+    # treina o arima
+    janela_dias_modelo <- 365
+    mod_aju <- lapply(list_comb, train_arima, ger_usi, irr_usi, janela_dias_modelo)
 }
 
 train_fisico_estimado <- function(usina, horizonte, data_set){
@@ -59,7 +73,22 @@ train_fisico_estimado <- function(usina, horizonte, data_set){
     }    
 }
 
+train_arima <- function(pars, ger_usi, irr_usi, janela_dias) {
 
+    ger_usi_filt <- copy(ger_usi)
+    irr_usi_filt <- copy(irr_usi)
+
+    ger_usi_filt <- ger_usi_filt[hora_min == pars$hora_min]
+    
+    irr_usi_filt <- irr_usi_filt[
+            id_modelo_nwp == pars$id_modelo_nwp &
+            passo_prev == pars$horiz_prev &
+            hora_min == pars$hora_min
+        ]
+
+    # comeca auto.arima
+
+}
 
 # AUXILIARES ---------------------------------------------------------------------------------------
 
