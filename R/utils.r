@@ -91,13 +91,14 @@ interpola_previsao_nwp <- function(data_set_met) {
     colorder <- names(data_set_met)
     data_hora_interpolacao <- cria_sequencia_datas(dt = data_set_met, discretizacao = 30)
     data_set_discretizacao <- merge(data_hora_interpolacao, data_set_met, by = c("data_hora_rodada", "data_hora_previsao", "id_modelo_nwp", "id_usina"), all.x = TRUE)
-    data_set_interpolado <- data_set_discretizacao[, valor := interpola_serie_temporal(valor),
+    data_set_discretizacao[, valor := interpola_serie_temporal(valor),
         by = .(id_modelo_nwp, id_usina, data_hora_rodada)
     ]
+    data_set_interpolado <- copy(data_set_discretizacao)
     cols_propagar <- setdiff(names(data_set_interpolado), c(names(data_hora_interpolacao), "valor"))
 
     for (col in cols_propagar) {
-        data_set_interpolado[, (col) := nafill(get(col), type = "locf"),
+        data_set_interpolado[, (col) := nafill(nafill(get(col), type = "locf"), type = "nocb"),
             by = .(id_modelo_nwp, id_usina, data_hora_rodada)
         ]
     }
@@ -124,7 +125,7 @@ cria_sequencia_datas <- function(dt, discretizacao) {
 #'
 #' Identifica as lacunas da serie temporal e preenche realizando interpolacao linear
 interpola_serie_temporal <- function(dt) {
-    dt_interpolado <- na.approx(dt)
+    dt_interpolado <- na.approx(dt, na.rm = FALSE)
     return(dt_interpolado)
 }
 
@@ -227,35 +228,85 @@ gera_combinacoes_modelo <- function(v_modelos_nwp, v_horizonte, periodo_ger) {
     return(lista_comb)
 }
 
-#' Filtra dados meteorologicos para cada combinacao nwp x passo de previsao x meia-hora
+#' Filtra data.table com informacao meteorologica e com geracao
+#' para ajuste do modelo de interesse (nwp x passo de previsao x meia-hora)
+#' e une ambos os data.tables em um unico
 #'
 #' @description
 #' Para cada trio modelo meteorologico x passo de previsao x meias-horas,
-#' e filtrado o conjunto de dados de interesse do data.table original
+#' e filtrado o conjunto de dados de interesse do data.table original com
+#' as previsoes e com a geracao. Realiza ainda a juncao em um unico data.table
+#' com os dados para treinamento
 #'
-#' @param irr_usi `data.table` pelo menos com as colunas:
-#' \itemize id_modelo_nwp - modelo meteorologico
-#' \item horiz_prev - passo de previsao
-#' \item hora_min - meias-horas com geracao solar (formato HH:MM)
-#' \item valor - irradiancia observada
+#' @param prev_met_usi `list` contendo data.tables pelo menos com as colunas:
+#' \itemize {
+#'  \item id_modelo_nwp - modelo meteorologico
+#'  \item data_hora_previsao - data referencia da previsao
+#'  \item horiz_prev - passo de previsao
+#'  \item hora_min - data_hora em formato HH:MM
+#'  \item valor - variavel meteorologica prevista
+#' }
 #'
-#' @param list_comb lista de listas, em que cada elemento contem:
+#' @param ger_usi `data.table` pelo menos com as colunas:
+#' \itemize {
+#'  \item data_hora_observacao - data referencia da observacao
+#'  \item hora_min - data_hora em formato HH:MM
+#'  \item valor - geracao observada
+#' }
+#'
+#' @param elem_comb `list` em que cada elemento contem:
 #' \itemize {
 #'   \item id_modelo_nwp
 #'   \item horiz_prev
 #'   \item hora_min
 #' }
 #'
-#' @return `data.table` com os dados meteorologicos filtrados
+#' @return `data.table` com os dados filtrados para treinamento
 
-filtra_dado_por_combinacao <- function(irr_usi, list_comb) {
-    irr_usi_filt <- copy(irr_usi)
+filtra_dado_por_combinacao <- function(elem_comb, prev_met_usi, ger_usi) {
+    ger_usi_filt <- copy(ger_usi)
+    prev_met_usi_list <- copy(prev_met_usi)
 
-    lapply(list_comb, function(pars) {
-        irr_usi_filt[
-            id_modelo_nwp == pars$id_modelo_nwp &
-                passo_prev == pars$horiz_prev &
-                hora_min == pars$hora_min
+    # filtra os dados para o trio nwp x passo de previsao x meia-hora desejado
+    ger_usi_filt <- ger_usi_filt[hora_min == elem_comb$hora_min]
+
+    prev_met_usi_list <- lapply(prev_met_usi_list, function(dt) {
+        dt[
+            id_modelo_nwp == elem_comb$id_modelo_nwp &
+                passo_prev == elem_comb$horiz_prev &
+                hora_min == elem_comb$hora_min
         ]
     })
+
+    # unifica as variaveis meteorologicas em um unico data.table
+    prev_met_usi_filt <- rbindlist(prev_met_usi_list, idcol = "variavel_meteoro")
+
+    id_cols <- setdiff(names(prev_met_usi_filt), c("valor", "variavel_meteoro"))
+
+    prev_usi_wide <- dcast(
+        prev_met_usi_filt,
+        formula = paste(paste(id_cols, collapse = " + "), "~ variavel_meteoro"),
+        value.var = "valor"
+    )
+
+    # une geracao com a variavel meteorologica
+
+    cols_apagar <- c("id_modelo_nwp", "id_usina", "latitude", "longitude", "data_hora_rodada", "passo_prev", "hora_min")
+    prev_usi_wide[, (cols_apagar) := NULL]
+
+    cols_apagar <- c("id_fonte_observacao", "id_usina", "status", "hora_min")
+    ger_usi_filt[, (cols_apagar) := NULL]
+
+    setnames(prev_usi_wide, "data_hora_previsao", "data_hora")
+    setnames(ger_usi_filt, "data_hora_observacao", "data_hora")
+
+    dt_merged <- merge(
+        prev_usi_wide,
+        ger_usi_filt,
+        by = "data_hora",
+        all.x = TRUE,
+        all.y = TRUE
+    )
+
+    return(dt_merged)
 }

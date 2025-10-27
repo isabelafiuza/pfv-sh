@@ -13,8 +13,6 @@ train_main <- function(args) { # ISABELA - EM DESENVOLVIMENTO - NAO ESTA FUNCION
 
     data_set_met <- lapply(data_set_met, associa_nwp_usina, dt_usinas)
 
-    # FUNCAO QUE CHECA SE NAO HA SALTO ENTRE AS DATAS DE PREVISAO
-
     data_set_met <- lapply(data_set_met, interpola_previsao_nwp)
     data_set_met <- lapply(data_set_met, adicionar_passo_previsao)
     # data_set$irrad_prev <- compatibiliza_datas(data_set)
@@ -94,6 +92,7 @@ train_fisico_estimado <- function(data_set) {
 #'
 #' @return modelos ajustados
 #'
+
 aplica_regressao_linear <- function(dt_y, dt_x) {
     dados <- cbind(dt_y, dt_x)
     resposta <- names(dt_y)
@@ -107,41 +106,19 @@ aplica_regressao_linear <- function(dt_y, dt_x) {
 }
 
 train_arima <- function(pars, ger_usi, prev_met_usi, janela_dias) {
-    ger_usi_filt <- copy(ger_usi)
-    prev_met_usi_filt <- copy(prev_met_usi)
-
-    ger_usi_filt <- ger_usi_filt[hora_min == pars$hora_min]
-
-    prev_met_usi_filt <- lapply(prev_met_usi_filt, function(dt) {
-        dt[
-            id_modelo_nwp == pars$id_modelo_nwp &
-                passo_prev == pars$horiz_prev &
-                hora_min == pars$hora_min
-        ]
-    })
-
-    prev_met_usi_filt <- rbindlist(prev_met_usi_filt, idcol = "variavel_meteoro")
-    
-    id_cols <- setdiff(names(prev_met_usi_filt), c("valor", "variavel_meteoro"))
-
-    prev_usi_wide <- dcast(
-        prev_met_usi_filt,
-        formula = paste(paste(id_cols, collapse = " + "), "~ variavel_meteoro"),
-        value.var = "valor"
-    )
-
-    # une geracao com a variavel meteorologica limitando pela data fim do observado
+    dt_treino <- filtra_dado_por_combinacao(pars, prev_met_usi, ger_usi)
 
     # seleciona janela dos dados para treinamento
-    dt_treino <- seleciona_janela(ger_usi_filt, prev_met_usi_filt, janela_dias_treinamento = 300)
+    dt_treino_filt <- seleciona_janela(dt_treino, janela_dias_treinamento = 300)
+    setnames(dt_treino_filt, "valor", "ger_obs")
 
     # avalia numero de conjuntos ger x irr x temp x umid
-    if (dados_suficientes(dt_treino, num_min_dados = 5) == TRUE) {
+    if (dados_suficientes(dt_treino_filt, num_min_dados = 5) == TRUE) {
         # ajusta modelo dummy
-        nlmod0 <- ajusta_dummy(dt_treino)
+        nlmod0 <- ajusta_dummy(dt_treino_filt)
 
         # normaliza as variaveis necessarias para o ajuste
-        norm_resultado <- normaliza_variaveis(dt_treino)
+        norm_resultado <- normaliza_variaveis(dt_treino_filt)
         dt_treino_norm <- norm_resultado$dados
         stats_norm <- norm_resultado$stats
 
@@ -230,7 +207,7 @@ renomeia_colunas <- function(dt, nome_atual, nome_novo) {
 
 #' Seleciona janela dos dados para treinamento
 #'
-#' @param dt_ger `data.table` com data_hora_observacao, geracao
+#' @param dt `data.table` com data_hora, geracao, variaveis meteorologicas
 #' @param janela_dias_treinamento numero de dias utilizados
 #' para treinamento
 #'
@@ -238,11 +215,13 @@ renomeia_colunas <- function(dt, nome_atual, nome_novo) {
 
 seleciona_janela <- function(dt, janela_dias_treinamento) {
     dt <- copy(dt)
-    dt[, data := as.Date(data_hora_observacao)]
+    dt[, data := as.Date(data_hora)]
 
     # considerar apenas as ultimas `janela_dias` datas
     ultimas_datas <- head(sort(unique(dt$data), decreasing = TRUE), janela_dias_treinamento)
     dt <- dt[data %in% ultimas_datas]
+
+    dt[, data := NULL]
 
     return(dt)
 }
@@ -254,9 +233,20 @@ seleciona_janela <- function(dt, janela_dias_treinamento) {
 #' @param num_min_dados numero minimo de registros validos simultaneos
 #'
 #' @return TRUE se houver dados validos, FALSE caso contrario
-
+#'
+#' @examples
+#' dt <- data.table(
+#'     data_hora = 1:5,
+#'     ger = c(10, NA, 12, 0, 15),
+#'     irr = c(200, 210, NA, 205, 215)
+#' )
+#' dados_suficientes(dt, num_min_dados = 2)
 dados_suficientes <- function(dt, num_min_dados) {
-    n_validos <- nrow(na.omit(dt[, .(ger, irr, temp, umid)]))
+    col_var <- setdiff(names(dt), "data_hora")
+
+    dt[, (col_var) := lapply(.SD, function(x) fifelse(x == 0, NA, x)), .SDcols = col_var]
+
+    n_validos <- nrow(na.omit(dt[, ..col_var]))
     if (n_validos < num_min_dados) {
         return(FALSE)
     }
@@ -285,13 +275,21 @@ ajusta_dummy <- function(dt) {
 #' }
 
 normaliza_variaveis <- function(dt) {
-    stats <- dt[, .(
-        ger_med = mean(ger, na.rm = TRUE), ger_sd = sd(ger, na.rm = T),
-        irr_med = mean(irr, na.rm = TRUE), irr_sd = sd(irr, na.rm = T)
-    )]
+    col_excluida <- "data_hora"
 
-    dt[, ger_norm := (ger - stats$ger_med) / stats$ger_sd]
-    dt[, irr_norm := (irr - stats$irr_med) / stats$irr_sd]
+    var_norm <- setdiff(names(dt), col_excluida)
+
+    stats <- dt[, lapply(.SD, function(x) {
+        c(med = mean(x, na.rm = TRUE), desv = sd(x, na.rm = TRUE))
+    }), .SDcols = var_norm]
+
+    stats <- transpose(stats, keep.names = "variavel")
+
+    setnames(stats, c("variavel", "med", "sd"))
+
+    dt[, paste0(var_norm, "_norm") := lapply(var_norm, function(v) {
+        (get(v) - stats[variavel == v, med]) / stats[variavel == v, sd]
+    })]
 
     list(dados = dt, stats = stats)
 }
