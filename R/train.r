@@ -3,16 +3,14 @@ train_main <- function(args) { # ISABELA - EM DESENVOLVIMENTO - NAO ESTA FUNCION
     v_usinas <- args$ids_usinas
     v_horizonte <- args$horizonte_dias
     v_modelos_nwp <- args$modelos_NWP
+    v_modelos_previsao <- sapply(args$modelos_previsao, function(x) x$tipo)
 
     dt_usinas <- get_usinas(conn, id_usina = v_usinas)
 
-    data_set <- get_dataset(args, conn, dias = 180)
-
+    data_set <- get_dataset(args, conn)
     data_set_ger <- data_set$ger_obs
     data_set_met <- data_set[names(data_set) != "ger_obs"]
-
-    data_set_met <- lapply(data_set_met, associa_nwp_usina, dt_usinas)
-
+    data_set_met <- lapply(data_set_met, associa_nwp_usina, dt_usinas = dt_usinas)
     data_set_met <- lapply(data_set_met, interpola_previsao_nwp)
     data_set_met <- lapply(data_set_met, adicionar_passo_previsao)
     # data_set$irrad_prev <- compatibiliza_datas(data_set)
@@ -21,33 +19,30 @@ train_main <- function(args) { # ISABELA - EM DESENVOLVIMENTO - NAO ESTA FUNCION
         dt_usinas = dt_usinas,
         dt_ger_obs = data_set_ger,
         dt_prev = data_set_met,
-        fator_tolerancia_geracao = args$fator_tolerancia_limite_inferior_geracao,
-        fator_tolerancia_horas = args$percentual_dias_geracao
+        parametros_periodo_geracao = args$parametros_periodo_geracao,
     )
 }
 
 treina_usina <- function(
-    iu, dt_usinas, dt_ger_obs, dt_prev,
-    fator_tolerancia_geracao, fator_tolerancia_horas) {
+    iu, dt_usinas, dt_ger_obs, dt_prev, parametros_periodo_geracao) {
     # Filtra os dados de geracao e meteorologicos referentes a usina atual
     dad_usi <- dt_usinas[id_usina == iu]
     ger_usi <- dt_ger_obs[id_usina == iu]
     prev_met_usi <- lapply(dt_prev, function(dt) dt[id_usina == iu])
 
     ger_usi[, hora_min := format(data_hora_observacao, "%H:%M")]
-    prev_met_usi <- lapply(dt_prev, function(dt) {
-        dt[, hora_min := format(data_hora_previsao, "%H:%M")]
-    })
+    prev_met_usi <- lapply(dt_prev, function(dt) {dt[, hora_min := format(data_hora_previsao, "%H:%M")]})
 
     # identificacao das semi-horas com geracao solar
-    periodo_ger <- identifica_periodo_ger(dad_usi, ger_usi, fator_tolerancia_geracao, fator_tolerancia_horas)
+
+    periodo_ger <- identifica_periodo_ger(dad_usi, ger_usi, fator_tol_ger = parametros_periodo_geracao$fator_tolerancia_limite_inferior_geracao, fator_tol_horas = parametros_periodo_geracao$percentual_dias_geracao)
 
     # gera lista com as combinacoes nwp x passo de previsao x meia-hora
     list_comb <- gera_combinacoes_modelo(v_modelos_nwp, v_horizonte, periodo_ger)
 
     # treina o arima
     janela_dias_modelo <- 365
-    mod_aju <- lapply(list_comb, train_arima, ger_usi, prev_met_usi, janela_dias_modelo)
+    mod_aju <- lapply(list_comb, train_arima, ger_usi = ger_usi, prev_met_usi = prev_met_usi, janela_dias = janela_dias_modelo)
 }
 
 #' Treinamento Usando O Metodo Fisico Estimado
@@ -156,8 +151,7 @@ train_arima <- function(pars, ger_usi, prev_met_usi, janela_dias) {
 #'
 #' @return lista contendo o dataset
 #'
-get_dataset <- function(args, conn, dias) {
-    janela <- paste0(args$data_referencia - dias, "/", args$data_referencia)
+get_dataset <- function(args, conn) {
 
     ger_obs <- get_geracao_observada(conn, id_usina = args$ids_usinas)
     irrad_prev <- get_irradiancia_prevista(conn, id_usina = args$ids_usinas, id_modelo_nwp = args$modelos_NWP)

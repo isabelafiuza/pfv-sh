@@ -83,7 +83,7 @@ adicionar_passo_previsao <- function(dt_prev) {
 #'
 #' Realiza interpolação dos dados previstos dos modelos NWP em intervalos semi-horarios
 #'
-#' @param data_set ´data.table´ com os dados de previsao NWP a serem interpolados
+#' @param data_set_met ´data.table´ com os dados de previsao NWP a serem interpolados
 #'
 #' @return ´data.table´ com dados previstos interpolados
 #'

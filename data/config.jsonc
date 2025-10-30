@@ -30,25 +30,33 @@
     // Vetor contendo o nome dos modelos NWP a serem considerados no processo de previsao
     "modelos_NWP": ["GFS"],
 
-    // Modelos de previsao de geracao. Devem ser listas contendo "tipo" indicando um tipo de modelo
-    // suportado na aplicação. Os elementos seguintes devem representar os argumentos...
+    // Modelos de previsao de geracao. 
+    // Devem ser listas contendo as seguintes chaves:
+    //      * "tipo" indicando um tipo de modelo suportado na aplicação: "arimax" | "fisico_estimado"
+    //      * "n_dias_treino" contendo valor inteiro que representa o numero de dias utilizados para 
+    //         treinamento do modelo, a serem contados a partir da data de referencia indicada na chave "data_referencia"
     "modelos_previsao": {
         "arimax": {
-            "tipo": "arimax"
+            "tipo": "arimax",
+            "n_dias_treino": 360
         },
         "fisico_estimado": {
-            "tipo": "fisico_estimado"
+            "tipo": "fisico_estimado",
+            "n_dias_treino": 180
         }
     },
 
-    // Fator de tolerancia superior para eliminacao de dados invalidos de geracao, multiplicado pela 
-    // capacidade instalada da usina
-    "fator_tolerancia_limite_superior_geracao": 1.1,
-
-    // Fator de tolerancia inferior para considerar geracao semi-horaria significativa, 
-    // multiplicado pela capacidade instalada da usina
-    "fator_tolerancia_limite_inferior_geracao": 0.01,
-
-    // Percentual minimo de dias com geracao acima do limite para considerar como semi-hora com geracao
-    "percentual_dias_geracao": 0.9
+    // Parametros utilizados para definicao do periodo de geracao.
+    // Deve ser uma lista contendo as seguintes chaves:
+    //      * "fator_tolerancia_limite_superior_geracao": Fator de tolerancia superior para eliminacao 
+    //        de dados invalidos de geracao, multiplicado pela capacidade instalada da usina,
+    //      * "fator_tolerancia_limite_inferior_geracao": Fator de tolerancia inferior para considerar 
+    //        geracao semi-horaria significativa, multiplicado pela capacidade instalada da usina
+    //      * "percentual_dias_geracao": Percentual minimo de dias com geracao acima do limite para 
+    //        considerar como semi-hora com geracao
+    "parametros_periodo_geracao":{
+        "fator_tolerancia_limite_superior_geracao": 1.1,
+        "fator_tolerancia_limite_inferior_geracao": 0.01,
+        "percentual_dias_geracao": 0.9
+    }
 }
