@@ -19,12 +19,16 @@ train_main <- function(args) { # ISABELA - EM DESENVOLVIMENTO - NAO ESTA FUNCION
         dt_usinas = dt_usinas,
         dt_ger_obs = data_set_ger,
         dt_prev = data_set_met,
-        parametros_periodo_geracao = args$parametros_periodo_geracao,
+        v_modelos_nwp = v_modelos_nwp,
+        v_horizonte = v_horizonte,
+        v_modelos_previsao = v_modelos_previsao,
+        parametros_modelo_previsao = args$modelos_previsao,
+        parametros_periodo_geracao = args$parametros_periodo_geracao
     )
 }
 
 treina_usina <- function(
-    iu, dt_usinas, dt_ger_obs, dt_prev, parametros_periodo_geracao) {
+    iu, dt_usinas, dt_ger_obs, dt_prev, v_modelos_nwp, v_horizonte, v_modelos_previsao, parametros_modelo_previsao, parametros_periodo_geracao) {
     # Filtra os dados de geracao e meteorologicos referentes a usina atual
     dad_usi <- dt_usinas[id_usina == iu]
     ger_usi <- dt_ger_obs[id_usina == iu]
@@ -34,16 +38,22 @@ treina_usina <- function(
     prev_met_usi <- lapply(dt_prev, function(dt) {dt[, hora_min := format(data_hora_previsao, "%H:%M")]})
 
     # identificacao das semi-horas com geracao solar
-
     periodo_ger <- identifica_periodo_ger(dad_usi, ger_usi, fator_tol_ger = parametros_periodo_geracao$fator_tolerancia_limite_inferior_geracao, fator_tol_horas = parametros_periodo_geracao$percentual_dias_geracao)
 
-    # gera lista com as combinacoes nwp x passo de previsao x meia-hora
-    list_comb <- gera_combinacoes_modelo(v_modelos_nwp, v_horizonte, periodo_ger)
+    # gera lista com as combinacoes nwp x passo de previsao x meia-hora x modelos de previsao
+    list_comb <- gera_combinacoes_modelo(v_modelos_nwp, v_horizonte, periodo_ger, v_modelos_previsao)
 
-    # treina o arima
-    janela_dias_modelo <- 365
-    mod_aju <- lapply(list_comb, train_arima, ger_usi = ger_usi, prev_met_usi = prev_met_usi, janela_dias = janela_dias_modelo)
+    # treina modelo
+    mod_aju <- lapply(list_comb, train_modelo, ger_usi = ger_usi, prev_met_usi = prev_met_usi, param_modelo_previsao = parametros_modelo_previsao)
 }
+
+train_modelo <- function(l, ger_usi, prev_met_usi, param_modelo_previsao){
+    modelo_despacho <- l$modelo_previsao
+    modelo_parametros <- param_modelo_previsao[[modelo_despacho]]
+    modelo <- parse_train(modelo_parametros, pars = l, ger_usi = ger_usi, prev_met_usi = prev_met_usi) # ISABELA - ONDE PAREI!! ARRUMAR ESSA CHAMADA
+}
+
+parse_train <- function(x, ...) UseMethod("parse_train")
 
 #' Treinamento Usando O Metodo Fisico Estimado
 #'
@@ -55,26 +65,17 @@ treina_usina <- function(
 #'
 #' @return modelos ajustados
 #'
-train_fisico_estimado <- function(data_set) {
-    data_set <- lapply(data_set, function(x) x[valor == 0, valor := NA])
-    data_set <- mapply(renomeia_colunas, data_set, "data_hora_observacao", "data_hora")
-    data_set <- mapply(renomeia_colunas, data_set, "data_hora_previsao", "data_hora")
-    data_set <- lapply(data_set, function(x) x[, hora := format(data_hora, "%H:%M")])
-    vetor_horas <- unique(data_set$ger_obs$hora) # ISABELA - DEPOIS SUBSTITUIR PELO PERIODO DE GERACAO IDENTIFICADO PARA CADA USINA
+parse_train.fisico_estimado <- function(pars, ger_usi, prev_met_usi){
+    dt_treino <- filtra_dado_por_combinacao(pars, prev_met_usi, ger_usi)
 
+    # seleciona janela dos dados para treinamento
+    dt_treino_filt <- seleciona_janela(dt_treino, janela_dias_treinamento = modelo_parametros$n_dias_treino)
+    setnames(dt_treino_filt, "valor", "ger_obs")
 
-    for (h in vetor_horas) {
-        list_y <- data_set[names(data_set) == "ger_obs"] # ISABELA - VERIFICAR SE TEM FORMA MELHOR DE FAZER
-        list_x <- data_set[names(data_set) != "ger_obs"]
+    dt_y <- dt_treino_filt$ger_obs
+    dt_x <- dt_treino_filt[names(dt_treino_filt) != "ger_obs"]
 
-        list_y <- lapply(list_y, function(x) x[hora == h])
-        list_x <- lapply(list_x, function(x) x[hora == h])
-
-        dt_y <- as.data.table(sapply(list_y, function(x) x$valor))
-        dt_x <- as.data.table(sapply(list_x, function(x) x$valor))
-
-        modelo <- aplica_regressao_linear(dt_y, dt_x)
-    }
+    modelo <- aplica_regressao_linear(dt_y, dt_x)
 }
 
 #' Aplica Regressao Linear
@@ -87,7 +88,6 @@ train_fisico_estimado <- function(data_set) {
 #'
 #' @return modelos ajustados
 #'
-
 aplica_regressao_linear <- function(dt_y, dt_x) {
     dados <- cbind(dt_y, dt_x)
     resposta <- names(dt_y)
@@ -100,11 +100,11 @@ aplica_regressao_linear <- function(dt_y, dt_x) {
     return(modelo)
 }
 
-train_arima <- function(pars, ger_usi, prev_met_usi, janela_dias) {
+parse_train.arimax <- function(pars, ger_usi, prev_met_usi, janela_dias) {
     dt_treino <- filtra_dado_por_combinacao(pars, prev_met_usi, ger_usi)
 
     # seleciona janela dos dados para treinamento
-    dt_treino_filt <- seleciona_janela(dt_treino, janela_dias_treinamento = 300)
+    dt_treino_filt <- seleciona_janela(dt_treino, janela_dias_treinamento = modelo_parametros$n_dias_treino)
     setnames(dt_treino_filt, "valor", "ger_obs")
 
     # avalia numero de conjuntos ger x irr x temp x umid
@@ -122,11 +122,6 @@ train_arima <- function(pars, ger_usi, prev_met_usi, janela_dias) {
     }
     # proximas funcoes sao aplicadas somente se a condicao for satisfeita
     # numero minimo pode ser parametro de entrada
-
-
-
-
-
 
     # cria diferenciacao para alguns horarios dias para que o ajuste
     # seja apenas ger x irr

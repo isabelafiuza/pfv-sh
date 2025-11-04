@@ -11,6 +11,8 @@
 parse_config <- function(config, conn) {
     valida_nomes_config(config)
     valida_tipos_config(config)
+
+    config$modelos_previsao <- lapply(config$modelos_previsao, parsearg_modelos_previsao)
     config$data_referencia <- parsearg_data_referencia(config$data_referencia)
     config$ids_usinas <- parsearg_ids_usinas(config$ids_usinas, conn)
     config$horizonte_dias <- parsearg_horizonte_dias(config$horizonte_dias)
@@ -174,5 +176,21 @@ parsearg_horizonte_dias <- function(x) {
 
 parsearg_modelos_NWP <- function(x) {
     x <- unlist(x)
+    return(x)
+}
+
+#' Interpretador De Chave `modelos_previsao`
+#' 
+#' Funcao interna de [`parse_config`] para interpretar o parametro `modelos_previsao` da configuracao
+#' 
+#' @param x valor da chave `modelos_previsao`; lista vazia ou de codigos de usinas
+#' @param conn objeto de conexao com um banco
+#' 
+#' @return se `x` era uma lista vazia, retorna um vetor com todos os ids no banco `conn`; do 
+#'     contrario retorna `x` vetorizado
+
+parsearg_modelos_previsao <- function(x){
+    nome <- x$tipo
+    class(x) <- nome
     return(x)
 }
