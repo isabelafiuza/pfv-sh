@@ -53,7 +53,7 @@ train_modelo <- function(l, ger_usi, prev_met_usi, param_modelo_previsao){
     modelo <- parse_train(modelo_parametros, pars = l, ger_usi = ger_usi, prev_met_usi = prev_met_usi) # ISABELA - ONDE PAREI!! ARRUMAR ESSA CHAMADA
 }
 
-parse_train <- function(x, ...) UseMethod("parse_train")
+parse_train <- function(modelo_parametros, ...) UseMethod("parse_train")
 
 #' Treinamento Usando O Metodo Fisico Estimado
 #'
@@ -65,7 +65,7 @@ parse_train <- function(x, ...) UseMethod("parse_train")
 #'
 #' @return modelos ajustados
 #'
-parse_train.fisico_estimado <- function(pars, ger_usi, prev_met_usi){
+parse_train.fisico_estimado <- function(modelo_parametros, pars, ger_usi, prev_met_usi){
     dt_treino <- filtra_dado_por_combinacao(pars, prev_met_usi, ger_usi)
 
     # seleciona janela dos dados para treinamento
@@ -100,7 +100,7 @@ aplica_regressao_linear <- function(dt_y, dt_x) {
     return(modelo)
 }
 
-parse_train.arimax <- function(pars, ger_usi, prev_met_usi, janela_dias) {
+parse_train.arimax <- function(modelo_parametros, pars, ger_usi, prev_met_usi, janela_dias) {
     dt_treino <- filtra_dado_por_combinacao(pars, prev_met_usi, ger_usi)
 
     # seleciona janela dos dados para treinamento
