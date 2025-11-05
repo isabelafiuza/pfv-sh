@@ -3,9 +3,9 @@
 #' Obtem as previsoes dos modelos NWP para as usinas simuladas. Para isso, realiza a associacao das coordenadas das
 #' usinas com quadricula correspondente do modelo NWP.
 #' E escolhida a quadricula que apresenta menor distancia euclidiana entre seu centroide e a coordenada da usina.
-#'
-#' @param dt_usinas ´data.table´ contendo os dados cadastrais das usinas
+#' 
 #' @param dt_prev ´data.table´ contendo os dados das variaveis previstas do modelo NWP
+#' @param dt_usinas ´data.table´ contendo os dados cadastrais das usinas
 #'
 #' @return ´data.table´ das usinas simuladas e as respectivas variaveis previstas do modelo NWP
 #'
@@ -14,7 +14,7 @@
 # Função usando distância euclidiana
 associa_nwp_usina <- function(dt_prev, dt_usinas) {
     # Coordenadas únicas da previsão
-    coord_prev <- unique(dt_prev[, .(latitude, longitude)])
+    coord_prev <- unique(dt_prev[, .(latitude, longitude), by = "id_modelo_nwp"])
 
     # Lista para armazenar os resultados
     lista_filtrados <- list()
@@ -27,11 +27,10 @@ associa_nwp_usina <- function(dt_prev, dt_usinas) {
         coord_prev[, distancia := sqrt((latitude - usina$latitude)^2 + (longitude - usina$longitude)^2)]
 
         # Pega a coordenada mais próxima
-        coord_mais_proxima <- coord_prev[which.min(distancia)]
+        coord_mais_proxima <- coord_prev[coord_prev[, .I[which.min(distancia)], by = "id_modelo_nwp"]$V1]
 
         # Filtra os dados da previsão para essa coordenada
-        dt_filt <- dt_prev[latitude == coord_mais_proxima$latitude &
-            longitude == coord_mais_proxima$longitude]
+        dt_filt <- dt_prev[dt_prev[, .I[which(latitude == coord_mais_proxima$latitude & longitude == coord_mais_proxima$longitude)], by = "id_modelo_nwp"]$V1]
 
         # Adiciona o id_usina
         dt_filt[, id_usina := usina$id_usina]
