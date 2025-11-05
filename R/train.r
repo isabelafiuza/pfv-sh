@@ -10,10 +10,6 @@ train_main <- function(args) { # ISABELA - EM DESENVOLVIMENTO - NAO ESTA FUNCION
     data_set <- get_dataset(args, conn)
     data_set_ger <- data_set$ger_obs
     data_set_met <- data_set[names(data_set) != "ger_obs"]
-    data_set_met <- lapply(data_set_met, associa_nwp_usina, dt_usinas = dt_usinas)
-    data_set_met <- lapply(data_set_met, interpola_previsao_nwp)
-    data_set_met <- lapply(data_set_met, adicionar_passo_previsao)
-    # data_set$irrad_prev <- compatibiliza_datas(data_set)
 
     artefatos <- lapply(v_usinas, treina_usina,
         dt_usinas = dt_usinas,
@@ -29,10 +25,16 @@ train_main <- function(args) { # ISABELA - EM DESENVOLVIMENTO - NAO ESTA FUNCION
 
 treina_usina <- function(
     iu, dt_usinas, dt_ger_obs, dt_prev, v_modelos_nwp, v_horizonte, v_modelos_previsao, parametros_modelo_previsao, parametros_periodo_geracao) {
-    # Filtra os dados de geracao e meteorologicos referentes a usina atual
+    
+    # Filtra os dados referentes a usina atual
     dad_usi <- dt_usinas[id_usina == iu]
-    ger_usi <- dt_ger_obs[id_usina == iu]
-    prev_met_usi <- lapply(dt_prev, function(dt) dt[id_usina == iu])
+    ger_usi <- dt_ger_obs[id_usina == iu]    
+
+    # Associa os dados NWP a usina, adiciona o passo de previsao e filtra usina atual
+    data_set_met <- lapply(data_set_met, associa_nwp_usina, dt_usinas = dt_usinas)
+    data_set_met <- lapply(data_set_met, interpola_previsao_nwp)
+    data_set_met <- lapply(data_set_met, adicionar_passo_previsao)
+    data_set_met <- lapply(data_set_met, function(dt) dt[id_usina == iu])
 
     ger_usi[, hora_min := format(data_hora_observacao, "%H:%M")]
     prev_met_usi <- lapply(dt_prev, function(dt) {dt[, hora_min := format(data_hora_previsao, "%H:%M")]})
@@ -80,7 +82,7 @@ parse_train.fisico_estimado <- function(modelo_parametros, pars, ger_usi, prev_m
 
 #' Aplica Regressao Linear
 #'
-#' Funcao que aplica regressao linear a um conjunto de dados e salva o
+#' Funcao que aplica regressao linear a um conjunto de dados
 #'
 #' @param dt_y ´data.table´ contendo a variavel resposta. Exemplo: geracao observada
 #' @param dt_x ´data.table´ contendo a(s) variavel(is) explicativas. Exemplo: irradiancia, umidade e temperatura
