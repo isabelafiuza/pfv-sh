@@ -11,30 +11,30 @@
     // Caminho para obtencao do artefato do modelo treinado 
     "artifact": ".",
 
-    // Vetor dos ids de usinas a serem consideradas no processo; vazio usa todas 
+    // Lista dos ids de usinas a serem consideradas no processo; vazio usa todas 
     "ids_usinas": ["BAUFI1"],
 
     // Vetor de uma posicao contendo data como string no padrao YYY-MM-DD indicando a data referencia de execucao,
-    // Para o modo de execucao ´predict´, corresponde a data de referencia para a qual se deseja realizar a predicao
-    // Para o modo de execucao ´train´, corresponde a data de referencia a partir da qual serao criados os subsets dos dados para treino 
+    //      * Para o modo de execucao ´predict´, corresponde a data de referencia para a qual se deseja realizar a predicao
+    //      * Para o modo de execucao ´train´, corresponde a data de referencia a partir da qual serao criados os subsets dos dados para treino 
     "data_referencia": "2025-07-02",
 
-    // Quantidade de dias do horizonte de previsao.
-    //      * Para o modo de execucao ´predict´, e tratado como o horizonte de dias sera realizada a previsao,
-    //      utilizando a data informada na chave "data_referencia". Exemplo: para "data_referencia": "2025-07-02" e 
-    //      "horizonte_dias": 5, sera realizada a previsao para o horizonte de "2025-07-02", "2025-07-03", "2025-07-04",
-    //      "2025-07-05", "2025-07-06".
+    // Horizonte de previsao.
+    //      * Para o modo de execucao ´predict´, e tratado como o horizonte de dias que sera realizada a previsao,
+    //      utilizando a data informada na chave "data_referencia". 
+    //      Exemplo: para "data_referencia": "2025-07-02" e "horizonte_dias": ["D+0","D+1"], sera realizada a previsao 
+    //      para o horizonte de "2025-07-02", "2025-07-03".
     //      * Para o modo de execucao ´train´, e tratado como o horizonte de dias a frente para treinamento do modelo.
     "horizonte_dias": ["D+0"],
 
-    // Vetor contendo o nome dos modelos NWP a serem considerados no processo de previsao
+    // Lista contendo o nome dos modelos NWP a serem considerados no processo de previsao
     "modelos_NWP": ["GFS"],
 
     // Modelos de previsao de geracao. 
     // Devem ser listas contendo as seguintes chaves:
     //      * "tipo" indicando um tipo de modelo suportado na aplicação: "arimax" | "fisico_estimado"
-    //      * "n_dias_treino" contendo valor inteiro que representa o numero de dias utilizados para 
-    //         treinamento do modelo, a serem contados a partir da data de referencia indicada na chave "data_referencia"
+    //      * "n_dias_treino" contendo valor inteiro que representa o numero de dias utilizados para treinamento 
+    //      do modelo, a serem contados a partir da data de referencia indicada na chave "data_referencia"
     "modelos_previsao": {
         "arimax": {
             "tipo": "arimax",
