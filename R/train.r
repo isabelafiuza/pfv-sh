@@ -1,5 +1,8 @@
 train_main <- function(args) { # ISABELA - EM DESENVOLVIMENTO - NAO ESTA FUNCIONANDO
     conn <- conectamock_pfv(args$input)
+    
+    data_fim_treino <- as.Date(args$data_referencia)
+    
     v_usinas <- args$ids_usinas
     v_horizonte <- args$horizonte_dias
     v_modelos_nwp <- args$modelos_NWP
@@ -22,18 +25,27 @@ train_main <- function(args) { # ISABELA - EM DESENVOLVIMENTO - NAO ESTA FUNCION
         dt_ger_obs = data_set_ger,
         dt_prev = data_set_met,
         fator_tolerancia_geracao = args$fator_tolerancia_limite_inferior_geracao,
-        fator_tolerancia_horas = args$percentual_dias_geracao
+        fator_tolerancia_horas = args$percentual_dias_geracao,
+        v_modelos_nwp = v_modelos_nwp,
+        v_horizonte = v_horizonte,
+        data_fim_treino = data_fim_treino
     )
 }
 
 treina_usina <- function(
     iu, dt_usinas, dt_ger_obs, dt_prev,
-    fator_tolerancia_geracao, fator_tolerancia_horas) {
+    fator_tolerancia_geracao, fator_tolerancia_horas,
+    v_modelos_nwp, v_horizonte, data_fim_treino) {
+    
+    # Filtra os dados de geracao e meteorologicos ate data fim do treino
+    dt_ger_obs <- dt_ger_obs[as.Date(data_hora_observacao) < data_fim_treino]
+    dt_prev <- lapply(dt_prev, function(dt) dt[as.Date(data_hora_previsao) < data_fim_treino])
+
     # Filtra os dados de geracao e meteorologicos referentes a usina atual
     dad_usi <- dt_usinas[id_usina == iu]
     ger_usi <- dt_ger_obs[id_usina == iu]
     prev_met_usi <- lapply(dt_prev, function(dt) dt[id_usina == iu])
-
+    
     ger_usi[, hora_min := format(data_hora_observacao, "%H:%M")]
     prev_met_usi <- lapply(dt_prev, function(dt) {
         dt[, hora_min := format(data_hora_previsao, "%H:%M")]
@@ -47,7 +59,17 @@ treina_usina <- function(
 
     # treina o arima
     janela_dias_modelo <- 365
-    mod_aju <- lapply(list_comb, train_arima, ger_usi, prev_met_usi, janela_dias_modelo)
+
+    mod_aju <- lapply(seq_along(list_comb), function(i) {
+        pars <- list_comb[[i]]
+        nlmod <- train_arima(pars, ger_usi, prev_met_usi, janela_dias_modelo)
+        list(
+            combinacao_ajuste = pars,
+            modelo = nlmod
+        )
+    })
+
+    saveRDS(mod_aju, file = paste(args$output, paste0(iu, "_arima_ajustado.rds"), sep = "/"))
 }
 
 #' Treinamento Usando O Metodo Fisico Estimado
@@ -112,37 +134,33 @@ train_arima <- function(pars, ger_usi, prev_met_usi, janela_dias) {
     dt_treino_filt <- seleciona_janela(dt_treino, janela_dias_treinamento = 300)
     setnames(dt_treino_filt, "valor", "ger_obs")
 
+    # ajusta modelo dummy
+    nlmod0 <- ajusta_dummy(dt_treino_filt)
+
     # avalia numero de conjuntos ger x irr x temp x umid
     if (dados_suficientes(dt_treino_filt, num_min_dados = 5) == TRUE) {
-        # ajusta modelo dummy
-        nlmod0 <- ajusta_dummy(dt_treino_filt)
-
         # normaliza as variaveis necessarias para o ajuste
         norm_resultado <- normaliza_variaveis(dt_treino_filt)
         dt_treino_norm <- norm_resultado$dados
         stats_norm <- norm_resultado$stats
 
+        cols_norm <- grep("_norm$", names(dt_treino_norm), value = TRUE)
+        dt_treino_norm <- dt_treino_norm[, ..cols_norm]
+
         # ajusta ARIMA
         nlmod1 <- ajusta_arima(dt_treino_norm, nlmod0)
+
+        # ajusta ARIMAX
+        nlmod2 <- ajusta_arimax(dt_treino_norm, nlmod0)
+
+        # calcular erro medio in-sample
+        erros <- calcula_erros(dt_treino_norm, nlmod1, nlmod2)
+
+        # seleciona do modelo com base no desvio e aicc
+        selecao <- seleciona_modelo(nlmod1, nlmod2, erros)
     }
-    # proximas funcoes sao aplicadas somente se a condicao for satisfeita
-    # numero minimo pode ser parametro de entrada
-
-
-
-
-
-
     # cria diferenciacao para alguns horarios dias para que o ajuste
     # seja apenas ger x irr
-
-    # ajusta arimax
-
-    # calcular erro medio in-sample
-
-    # seleciona do modelo com base no desvio e aicc
-
-    # retorna modelos
 }
 
 # AUXILIARES ---------------------------------------------------------------------------------------
@@ -213,9 +231,11 @@ renomeia_colunas <- function(dt, nome_atual, nome_novo) {
 #'
 #' @return subset do data.table filtrado
 
-seleciona_janela <- function(dt, janela_dias_treinamento) {
+seleciona_janela <- function(dt, data_ref, janela_dias_treinamento) {
     dt <- copy(dt)
     dt[, data := as.Date(data_hora)]
+
+    dt[data < data_ref]
 
     # considerar apenas as ultimas `janela_dias` datas
     ultimas_datas <- head(sort(unique(dt$data), decreasing = TRUE), janela_dias_treinamento)
@@ -296,13 +316,79 @@ normaliza_variaveis <- function(dt) {
 
 #' Ajusta modelo ARIMA simples
 #'
-#' @param dt data.table com variavel \code{ger_norm}.
+#' @param dt data.table com variavel \code{ger_obs_norm}.
 #' @param nlmod0 modelo dummy utilizado em caso de erro.
 #'
 #' @return modelo ajustado do tipo \code{Arima}.
 ajusta_arima <- function(dt, nlmod0) {
-    tryCatch(
-        auto.arima(dt$ger_N, allowdrift = FALSE, allowmean = FALSE),
+    y <- dt$ger_obs_norm
+    y_validos <- y[!is.na(y)]
+
+    modelo <- tryCatch(
+        auto.arima(y_validos, allowdrift = FALSE, allowmean = FALSE),
         error = function(e) nlmod0
+    )
+}
+
+#' Ajusta modelo ARIMAX com variaveis exogenas
+#'
+#' @param dt data.table com variavel \code{ger_obs_norm}, \code{irrad_prev_norm},
+#' \code{temp_prev_norm} e \code{umid_prev_norm}.
+#' @param nlmod0 modelo dummy utilizado em caso de erro.
+#'
+#' @return modelo ajustado do tipo \code{Arima}.
+ajusta_arimax <- function(dt, nlmod0) {
+    var_exog <- setdiff(names(dt), "ger_obs_norm")
+    dt_valido <- dt[complete.cases(dt[, c("ger_obs_norm", ..var_exog)])]
+
+    xreg <- dt_valido[, ..var_exog]
+
+    modelo <- tryCatch(
+        auto.arima(dt_valido$ger_obs_norm,
+            xreg = as.matrix(xreg),
+            allowdrift = FALSE, allowmean = FALSE
+        ),
+        error = function(e) nlmod0
+    )
+}
+
+#' Calcula erros medios in-sample dos modelos
+#'
+#' @param dt data.table com variável \code{ger_obs_norm}, \code{irrad_prev_norm},
+#' \code{temp_prev_norm} e \code{umid_prev_norm}..
+#' @param nlmod1 Modelo ARIMA.
+#' @param nlmod2 Modelo ARIMAX.
+#'
+#' @return Lista com erro médio de cada modelo.
+calcula_erros <- function(dt, nlmod1, nlmod2) {
+    prev1 <- as.numeric(fitted(nlmod1))
+    prev2 <- as.numeric(fitted(nlmod2))
+
+    # filtra valores de geracao nao-NA
+    y <- dt$ger_obs_norm
+    y_validos <- y[!is.na(y)]
+
+    # filtra valores nao-NA coincidentes de geracao e variaveis exogenas
+    var_exog <- setdiff(names(dt), "ger_obs_norm")
+    dt_valido <- dt[complete.cases(dt[, c("ger_obs_norm", ..var_exog)])]
+    
+    list(
+        erro1 = mean(abs(y_validos - prev1), na.rm = TRUE),
+        erro2 = mean(abs(dt_valido$ger_obs_norm - prev2), na.rm = TRUE)
+    )
+}
+
+#' Seleciona o melhor modelo entre ARIMA e ARIMAX
+#'
+#' @param nlmod1 Modelo ARIMA.
+#' @param nlmod2 Modelo ARIMAX.
+#' @param erros Lista com erros medios dos modelos.
+#'
+#' @return Lista com modelo escolhido.
+seleciona_modelo <- function(nlmod1, nlmod2, erros) {
+    escolhe_arima <- (nlmod1$aicc <= nlmod2$aicc) && (erros$erro1 <= erros$erro2)
+    list(
+        modelo_escolhido = if (escolhe_arima) "ARIMA" else "ARIMAX",
+        modelo_final = if (escolhe_arima) nlmod1 else nlmod2
     )
 }

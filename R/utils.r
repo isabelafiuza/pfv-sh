@@ -1,3 +1,32 @@
+#' Gera vetor de datas-alvo de previsao
+#'
+#' Esta funcao cria um vetor de datas correspondentes aos horizontes de previsao,
+#' com base em uma data de referencia (default: o dia de execucao da previsao)
+#' e em um vetor de horizontes (D+0 a D+9).
+#'
+#' @param data_referencia `Date` ou `character` coerente com formato de data.
+#'   Representa a data-base da execucao da previsao (ex: "2025-11-07").
+#' @param v_horizonte Vetor indicando os horizontes de previsao.
+#'
+#' @return Vetor de classe `Date` contendo as datas alvo de previsao.
+#' @examples
+#' gera_datas_alvo("2025-11-07", c("D+0", "D+1"))
+#' # Retorna: 2025-11-07, 2025-11-08
+#'
+#' @export
+define_hor_prev <- function(data_referencia, v_horizonte) {
+  
+  data_ref <- as.Date(data_referencia)
+
+  datas_alvo <- seq.Date(
+    from = data_ref,
+    by = "day",
+    length.out = length(v_horizonte)
+  )
+
+  return(datas_alvo)
+}
+
 #' Associa Usina A Quadricula da NWP
 #'
 #' Obtem as previsoes dos modelos NWP para as usinas simuladas. Para isso, realiza a associacao das coordenadas das
@@ -290,7 +319,6 @@ filtra_dado_por_combinacao <- function(elem_comb, prev_met_usi, ger_usi) {
     )
 
     # une geracao com a variavel meteorologica
-
     cols_apagar <- c("id_modelo_nwp", "id_usina", "latitude", "longitude", "data_hora_rodada", "passo_prev", "hora_min")
     prev_usi_wide[, (cols_apagar) := NULL]
 
