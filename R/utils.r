@@ -32,9 +32,9 @@ define_hor_prev <- function(data_referencia, v_horizonte) {
 #' Obtem as previsoes dos modelos NWP para as usinas simuladas. Para isso, realiza a associacao das coordenadas das
 #' usinas com quadricula correspondente do modelo NWP.
 #' E escolhida a quadricula que apresenta menor distancia euclidiana entre seu centroide e a coordenada da usina.
-#'
-#' @param dt_usinas ´data.table´ contendo os dados cadastrais das usinas
+#' 
 #' @param dt_prev ´data.table´ contendo os dados das variaveis previstas do modelo NWP
+#' @param dt_usinas ´data.table´ contendo os dados cadastrais das usinas
 #'
 #' @return ´data.table´ das usinas simuladas e as respectivas variaveis previstas do modelo NWP
 #'
@@ -43,7 +43,7 @@ define_hor_prev <- function(data_referencia, v_horizonte) {
 # Função usando distância euclidiana
 associa_nwp_usina <- function(dt_prev, dt_usinas) {
     # Coordenadas únicas da previsão
-    coord_prev <- unique(dt_prev[, .(latitude, longitude)])
+    coord_prev <- unique(dt_prev[, .(latitude, longitude), by = "id_modelo_nwp"])
 
     # Lista para armazenar os resultados
     lista_filtrados <- list()
@@ -56,11 +56,10 @@ associa_nwp_usina <- function(dt_prev, dt_usinas) {
         coord_prev[, distancia := sqrt((latitude - usina$latitude)^2 + (longitude - usina$longitude)^2)]
 
         # Pega a coordenada mais próxima
-        coord_mais_proxima <- coord_prev[which.min(distancia)]
+        coord_mais_proxima <- coord_prev[coord_prev[, .I[which.min(distancia)], by = "id_modelo_nwp"]$V1]
 
         # Filtra os dados da previsão para essa coordenada
-        dt_filt <- dt_prev[latitude == coord_mais_proxima$latitude &
-            longitude == coord_mais_proxima$longitude]
+        dt_filt <- dt_prev[dt_prev[, .I[which(latitude == coord_mais_proxima$latitude & longitude == coord_mais_proxima$longitude)], by = "id_modelo_nwp"]$V1]
 
         # Adiciona o id_usina
         dt_filt[, id_usina := usina$id_usina]
@@ -112,14 +111,14 @@ adicionar_passo_previsao <- function(dt_prev) {
 #'
 #' Realiza interpolação dos dados previstos dos modelos NWP em intervalos semi-horarios
 #'
-#' @param data_set ´data.table´ com os dados de previsao NWP a serem interpolados
+#' @param dt_prev ´data.table´ com os dados de previsao NWP a serem interpolados
 #'
 #' @return ´data.table´ com dados previstos interpolados
 #'
-interpola_previsao_nwp <- function(data_set_met) {
-    colorder <- names(data_set_met)
-    data_hora_interpolacao <- cria_sequencia_datas(dt = data_set_met, discretizacao = 30)
-    data_set_discretizacao <- merge(data_hora_interpolacao, data_set_met, by = c("data_hora_rodada", "data_hora_previsao", "id_modelo_nwp", "id_usina"), all.x = TRUE)
+interpola_previsao_nwp <- function(dt_prev) {
+    colorder <- names(dt_prev)
+    data_hora_interpolacao <- cria_sequencia_datas(dt = dt_prev, discretizacao = "30 min")
+    data_set_discretizacao <- merge(data_hora_interpolacao, dt_prev, by = c("data_hora_rodada", "data_hora_previsao", "id_modelo_nwp", "id_usina"), all.x = TRUE)
     data_set_discretizacao[, valor := interpola_serie_temporal(valor),
         by = .(id_modelo_nwp, id_usina, data_hora_rodada)
     ]
@@ -133,6 +132,7 @@ interpola_previsao_nwp <- function(data_set_met) {
     }
 
     setcolorder(data_set_interpolado, colorder)
+    data_set_interpolado <- data_set_interpolado[order(id_modelo_nwp, data_hora_rodada, data_hora_previsao)]
 
     return(data_set_interpolado)
 }
@@ -145,7 +145,7 @@ cria_sequencia_datas <- function(dt, discretizacao) {
     dt_data_inicio <- dt[, .(data_inicio = min(data_hora_previsao)), by = .(id_modelo_nwp, id_usina, data_hora_rodada)]
     dt_data_fim <- dt[, .(data_fim = max(data_hora_previsao)), by = .(id_modelo_nwp, id_usina, data_hora_rodada)]
     dt_datas_inicio_fim <- merge(dt_data_inicio, dt_data_fim, by = c("id_modelo_nwp", "id_usina", "data_hora_rodada"))
-    dt_sequencia_datas <- dt_datas_inicio_fim[, .(data_hora_previsao = seq(data_inicio, data_fim, by = paste0(discretizacao, " min"))), by = .(id_modelo_nwp, id_usina, data_hora_rodada)]
+    dt_sequencia_datas <- dt_datas_inicio_fim[, .(data_hora_previsao = seq(data_inicio, data_fim, by = discretizacao)), by = .(id_modelo_nwp, id_usina, data_hora_rodada)]
 
     return(dt_sequencia_datas)
 }

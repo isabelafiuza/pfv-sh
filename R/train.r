@@ -1,4 +1,4 @@
-train_main <- function(args) { # ISABELA - EM DESENVOLVIMENTO - NAO ESTA FUNCIONANDO
+train_main <- function(args) {
     conn <- conectamock_pfv(args$input)
     
     data_fim_treino <- as.Date(args$data_referencia)
@@ -6,71 +6,67 @@ train_main <- function(args) { # ISABELA - EM DESENVOLVIMENTO - NAO ESTA FUNCION
     v_usinas <- args$ids_usinas
     v_horizonte <- args$horizonte_dias
     v_modelos_nwp <- args$modelos_NWP
+    v_modelos_previsao <- sapply(args$modelos_previsao, function(x) x$tipo)
 
     dt_usinas <- get_usinas(conn, id_usina = v_usinas)
 
-    data_set <- get_dataset(args, conn, dias = 180)
-
+    data_set <- get_dataset(args, conn)
     data_set_ger <- data_set$ger_obs
     data_set_met <- data_set[names(data_set) != "ger_obs"]
-
-    data_set_met <- lapply(data_set_met, associa_nwp_usina, dt_usinas)
-
-    data_set_met <- lapply(data_set_met, interpola_previsao_nwp)
-    data_set_met <- lapply(data_set_met, adicionar_passo_previsao)
-    # data_set$irrad_prev <- compatibiliza_datas(data_set)
 
     artefatos <- lapply(v_usinas, treina_usina,
         dt_usinas = dt_usinas,
         dt_ger_obs = data_set_ger,
         dt_prev = data_set_met,
-        fator_tolerancia_geracao = args$fator_tolerancia_limite_inferior_geracao,
-        fator_tolerancia_horas = args$percentual_dias_geracao,
         v_modelos_nwp = v_modelos_nwp,
         v_horizonte = v_horizonte,
+        v_modelos_previsao = v_modelos_previsao,
+        parametros_modelo_previsao = args$modelos_previsao,
+        parametros_periodo_geracao = args$parametros_periodo_geracao,
         data_fim_treino = data_fim_treino
     )
 }
 
 treina_usina <- function(
-    iu, dt_usinas, dt_ger_obs, dt_prev,
-    fator_tolerancia_geracao, fator_tolerancia_horas,
-    v_modelos_nwp, v_horizonte, data_fim_treino) {
+    iu, dt_usinas, dt_ger_obs, dt_prev, v_modelos_nwp, v_horizonte, v_modelos_previsao, parametros_modelo_previsao, parametros_periodo_geracao, data_fim_treino) {
     
-    # Filtra os dados de geracao e meteorologicos ate data fim do treino
-    dt_ger_obs <- dt_ger_obs[as.Date(data_hora_observacao) < data_fim_treino]
-    dt_prev <- lapply(dt_prev, function(dt) dt[as.Date(data_hora_previsao) < data_fim_treino])
-
-    # Filtra os dados de geracao e meteorologicos referentes a usina atual
+    # Filtra os dados referentes a usina atual
     dad_usi <- dt_usinas[id_usina == iu]
-    ger_usi <- dt_ger_obs[id_usina == iu]
-    prev_met_usi <- lapply(dt_prev, function(dt) dt[id_usina == iu])
-    
+    ger_usi <- dt_ger_obs[id_usina == iu]    
+
+    # Associa os dados NWP a usina, adiciona o passo de previsao e filtra usina atual
+    dt_prev <- lapply(dt_prev, associa_nwp_usina, dt_usinas = dt_usinas)
+    dt_prev <- lapply(dt_prev, interpola_previsao_nwp)
+    #dt_prev <- lapply(dt_prev, preenche_ausencia_previsao)
+    dt_prev <- lapply(dt_prev, adicionar_passo_previsao)    
+    dt_prev <- lapply(dt_prev, function(dt) dt[id_usina == iu])
+
     ger_usi[, hora_min := format(data_hora_observacao, "%H:%M")]
-    prev_met_usi <- lapply(dt_prev, function(dt) {
-        dt[, hora_min := format(data_hora_previsao, "%H:%M")]
-    })
+    prev_met_usi <- lapply(dt_prev, function(dt) {dt[, hora_min := format(data_hora_previsao, "%H:%M")]})
 
     # identificacao das semi-horas com geracao solar
-    periodo_ger <- identifica_periodo_ger(dad_usi, ger_usi, fator_tolerancia_geracao, fator_tolerancia_horas)
+    periodo_ger <- identifica_periodo_ger(dad_usi, ger_usi, fator_tol_ger = parametros_periodo_geracao$fator_tolerancia_limite_inferior_geracao, fator_tol_horas = parametros_periodo_geracao$percentual_dias_geracao)
 
-    # gera lista com as combinacoes nwp x passo de previsao x meia-hora
-    list_comb <- gera_combinacoes_modelo(v_modelos_nwp, v_horizonte, periodo_ger)
+    # gera lista com as combinacoes nwp x passo de previsao x meia-hora x modelos de previsao
+    list_comb <- gera_combinacoes_modelo(v_modelos_nwp, v_horizonte, periodo_ger, v_modelos_previsao)
 
-    # treina o arima
-    janela_dias_modelo <- 365
-
-    mod_aju <- lapply(seq_along(list_comb), function(i) {
-        pars <- list_comb[[i]]
-        nlmod <- train_arima(pars, ger_usi, prev_met_usi, janela_dias_modelo)
-        list(
-            combinacao_ajuste = pars,
-            modelo = nlmod
-        )
-    })
-
-    saveRDS(mod_aju, file = paste(args$output, paste0(iu, "_arima_ajustado.rds"), sep = "/"))
+    # treina modelo
+    mod_aju <- lapply(list_comb, train_modelo, ger_usi = ger_usi, prev_met_usi = prev_met_usi, param_modelo_previsao = parametros_modelo_previsao)
+    # TODO - alterar para salvar todos os modelos
+    saveRDS(mod_aju, file = paste(args$output, paste0(iu, "_modelos_ajustados.rds"), sep = "/"))
 }
+
+train_modelo <- function(l, ger_usi, prev_met_usi, param_modelo_previsao){
+    modelo_despacho <- l$modelo_previsao
+    modelo_parametros <- param_modelo_previsao[[modelo_despacho]]
+    nlmod <- parse_train(modelo_parametros, pars = l, ger_usi = ger_usi, prev_met_usi = prev_met_usi) # ISABELA - ONDE PAREI!! ARRUMAR ESSA CHAMADA
+    list(
+        combinacao_ajuste = l,
+        modelo = nlmod
+    )
+}
+
+parse_train <- function(modelo_parametros, ...) UseMethod("parse_train")
 
 #' Treinamento Usando O Metodo Fisico Estimado
 #'
@@ -82,31 +78,22 @@ treina_usina <- function(
 #'
 #' @return modelos ajustados
 #'
-train_fisico_estimado <- function(data_set) {
-    data_set <- lapply(data_set, function(x) x[valor == 0, valor := NA])
-    data_set <- mapply(renomeia_colunas, data_set, "data_hora_observacao", "data_hora")
-    data_set <- mapply(renomeia_colunas, data_set, "data_hora_previsao", "data_hora")
-    data_set <- lapply(data_set, function(x) x[, hora := format(data_hora, "%H:%M")])
-    vetor_horas <- unique(data_set$ger_obs$hora) # ISABELA - DEPOIS SUBSTITUIR PELO PERIODO DE GERACAO IDENTIFICADO PARA CADA USINA
+parse_train.fisico_estimado <- function(modelo_parametros, pars, ger_usi, prev_met_usi){
+    dt_treino <- filtra_dado_por_combinacao(pars, prev_met_usi, ger_usi)
 
+    # seleciona janela dos dados para treinamento
+    dt_treino_filt <- seleciona_janela(dt_treino, janela_dias_treinamento = modelo_parametros$n_dias_treino)
+    setnames(dt_treino_filt, "valor", "ger_obs")
 
-    for (h in vetor_horas) {
-        list_y <- data_set[names(data_set) == "ger_obs"] # ISABELA - VERIFICAR SE TEM FORMA MELHOR DE FAZER
-        list_x <- data_set[names(data_set) != "ger_obs"]
+    dt_y <- dt_treino_filt$ger_obs
+    dt_x <- dt_treino_filt[names(dt_treino_filt) != "ger_obs"]
 
-        list_y <- lapply(list_y, function(x) x[hora == h])
-        list_x <- lapply(list_x, function(x) x[hora == h])
-
-        dt_y <- as.data.table(sapply(list_y, function(x) x$valor))
-        dt_x <- as.data.table(sapply(list_x, function(x) x$valor))
-
-        modelo <- aplica_regressao_linear(dt_y, dt_x)
-    }
+    modelo <- aplica_regressao_linear(dt_y, dt_x)
 }
 
 #' Aplica Regressao Linear
 #'
-#' Funcao que aplica regressao linear a um conjunto de dados e salva o
+#' Funcao que aplica regressao linear a um conjunto de dados
 #'
 #' @param dt_y ´data.table´ contendo a variavel resposta. Exemplo: geracao observada
 #' @param dt_x ´data.table´ contendo a(s) variavel(is) explicativas. Exemplo: irradiancia, umidade e temperatura
@@ -114,7 +101,6 @@ train_fisico_estimado <- function(data_set) {
 #'
 #' @return modelos ajustados
 #'
-
 aplica_regressao_linear <- function(dt_y, dt_x) {
     dados <- cbind(dt_y, dt_x)
     resposta <- names(dt_y)
@@ -127,11 +113,11 @@ aplica_regressao_linear <- function(dt_y, dt_x) {
     return(modelo)
 }
 
-train_arima <- function(pars, ger_usi, prev_met_usi, janela_dias) {
+parse_train.arimax <- function(modelo_parametros, pars, ger_usi, prev_met_usi, janela_dias) {
     dt_treino <- filtra_dado_por_combinacao(pars, prev_met_usi, ger_usi)
 
     # seleciona janela dos dados para treinamento
-    dt_treino_filt <- seleciona_janela(dt_treino, janela_dias_treinamento = 300)
+    dt_treino_filt <- seleciona_janela(dt_treino, janela_dias_treinamento = modelo_parametros$n_dias_treino)
     setnames(dt_treino_filt, "valor", "ger_obs")
 
     # ajusta modelo dummy
@@ -174,8 +160,7 @@ train_arima <- function(pars, ger_usi, prev_met_usi, janela_dias) {
 #'
 #' @return lista contendo o dataset
 #'
-get_dataset <- function(args, conn, dias) {
-    janela <- paste0(args$data_referencia - dias, "/", args$data_referencia)
+get_dataset <- function(args, conn) {
 
     ger_obs <- get_geracao_observada(conn, id_usina = args$ids_usinas)
     irrad_prev <- get_irradiancia_prevista(conn, id_usina = args$ids_usinas, id_modelo_nwp = args$modelos_NWP)
@@ -186,9 +171,52 @@ get_dataset <- function(args, conn, dias) {
     return(out)
 }
 
-preenche_lacunas_previsao <- function(data_set) { # ISABELA - EM DESENVOLVIMENTO - NAO ESTA FUNCIONANDO
+#' Preenche Lacunas de Previsao
+#' 
+#' Identifica dias em que nao ha rodada do modelo meteorologico na base de dados e preenche as previsoes
+#' referentes a essa execucao ausente com NA. 
+#' A funcao avalia a coluna 'data_hora_rodada' de cada modelo meteorologico e, sendo verificada a 
+#' ausencia de alguma data, inclui dados NA para compatibilizacao das series temporais.
+#' 
+#' @param dt 'data.table' contendo as previsoes meteorologicas
+#' 
+#' @return 'data.table' com a coluna
+#' 
+preenche_ausencia_previsao <- function(dt) { # ISABELA - EM DESENVOLVIMENTO - NAO ESTA FUNCIONANDO
 
-    datas_rodadas <- unique(data_set$data_hora_rodada)
+    datas_execucao <- dt[, .(data_hora_rodada = unique(dt$data_hora_rodada)), by = .(id_modelo_nwp, id_usina)]
+    datas_completas <- dt[, .(data_hora_rodada = seq.POSIXt(from = min(data_hora_rodada), to = max(data_hora_rodada), by = "days")), by = .(id_modelo_nwp, id_usina)]
+
+    dt_data_inicio <- dt[, .(data_inicio = min(data_hora_previsao)), by = .(id_modelo_nwp, id_usina, data_hora_rodada)]
+    dt_data_fim <- dt[, .(data_fim = max(data_hora_previsao)), by = .(id_modelo_nwp, id_usina, data_hora_rodada)]
+    dt_datas_inicio_fim <- merge(dt_data_inicio, dt_data_fim, by = c("id_modelo_nwp", "id_usina", "data_hora_rodada"))
+    dt_datas_inicio_fim_completas <- merge(datas_completas, dt_datas_inicio_fim, by = c("id_modelo_nwp", "id_usina", "data_hora_rodada"), all.x = TRUE)
+    
+    # AVALIAR ESSA LOGICA
+    dt_datas_inicio_fim_completas[, data_inicio := nafill(seq.POSIXt(from = data_hora_rodada, length = 2, by = "days")[-1]), by = .(id_modelo_nwp, id_usina, data_hora_rodada)]
+    dt_datas_inicio_fim_completas[, data_fim := nafill(), by = .(id_modelo_nwp, id_usina, data_hora_rodada)]
+
+    cols_propagar <- setdiff(names(dt_datas_inicio_fim), names(datas_completas))
+    for (col in cols_propagar) {
+        if
+        dt_datas_inicio_fim_completas[, (col) := nafill(nafill(get(col), type = "locf"), type = "nocb"),
+            by = .(id_modelo_nwp, id_usina, data_hora_rodada)
+        ]
+    }
+}
+
+cria_dt_dummy <- function(datas_execucao_dummy, dt_original){
+    dt_dummy <- dt[id_modelo_nwp == datas_execucao_dummy$id_modelo_nwp &
+                    id_usina == datas_execucao_dummy$id_usina]
+
+    return(dt_dummy)
+}
+
+cria_dt_completo <- function(datas_faltantes, dt_original){
+
+    dt_auxiliar <- dt_original[id_modelo_nwp == datas_faltantes$id_modelo_nwp &
+                                id_usina == datas_faltantes$id_usina]
+    
 }
 
 compatibiliza_datas <- function(data_set) { # ISABELA - EM DESENVOLVIMENTO - NAO ESTA FUNCIONANDO
