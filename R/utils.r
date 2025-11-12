@@ -82,14 +82,14 @@ adicionar_passo_previsao <- function(dt_prev) {
 #'
 #' Realiza interpolação dos dados previstos dos modelos NWP em intervalos semi-horarios
 #'
-#' @param data_set_met ´data.table´ com os dados de previsao NWP a serem interpolados
+#' @param dt_prev ´data.table´ com os dados de previsao NWP a serem interpolados
 #'
 #' @return ´data.table´ com dados previstos interpolados
 #'
-interpola_previsao_nwp <- function(data_set_met) {
-    colorder <- names(data_set_met)
-    data_hora_interpolacao <- cria_sequencia_datas(dt = data_set_met, discretizacao = 30)
-    data_set_discretizacao <- merge(data_hora_interpolacao, data_set_met, by = c("data_hora_rodada", "data_hora_previsao", "id_modelo_nwp", "id_usina"), all.x = TRUE)
+interpola_previsao_nwp <- function(dt_prev) {
+    colorder <- names(dt_prev)
+    data_hora_interpolacao <- cria_sequencia_datas(dt = dt_prev, discretizacao = "30 min")
+    data_set_discretizacao <- merge(data_hora_interpolacao, dt_prev, by = c("data_hora_rodada", "data_hora_previsao", "id_modelo_nwp", "id_usina"), all.x = TRUE)
     data_set_discretizacao[, valor := interpola_serie_temporal(valor),
         by = .(id_modelo_nwp, id_usina, data_hora_rodada)
     ]
@@ -103,6 +103,7 @@ interpola_previsao_nwp <- function(data_set_met) {
     }
 
     setcolorder(data_set_interpolado, colorder)
+    data_set_interpolado <- data_set_interpolado[order(id_modelo_nwp, data_hora_rodada, data_hora_previsao)]
 
     return(data_set_interpolado)
 }
@@ -115,7 +116,7 @@ cria_sequencia_datas <- function(dt, discretizacao) {
     dt_data_inicio <- dt[, .(data_inicio = min(data_hora_previsao)), by = .(id_modelo_nwp, id_usina, data_hora_rodada)]
     dt_data_fim <- dt[, .(data_fim = max(data_hora_previsao)), by = .(id_modelo_nwp, id_usina, data_hora_rodada)]
     dt_datas_inicio_fim <- merge(dt_data_inicio, dt_data_fim, by = c("id_modelo_nwp", "id_usina", "data_hora_rodada"))
-    dt_sequencia_datas <- dt_datas_inicio_fim[, .(data_hora_previsao = seq(data_inicio, data_fim, by = paste0(discretizacao, " min"))), by = .(id_modelo_nwp, id_usina, data_hora_rodada)]
+    dt_sequencia_datas <- dt_datas_inicio_fim[, .(data_hora_previsao = seq(data_inicio, data_fim, by = discretizacao)), by = .(id_modelo_nwp, id_usina, data_hora_rodada)]
 
     return(dt_sequencia_datas)
 }
