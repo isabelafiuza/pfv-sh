@@ -1,4 +1,4 @@
-train_main <- function(args) { # ISABELA - EM DESENVOLVIMENTO - NAO ESTA FUNCIONANDO
+train_main <- function(args) {
     conn <- conectamock_pfv(args$input)
     v_usinas <- args$ids_usinas
     v_horizonte <- args$horizonte_dias
@@ -31,10 +31,11 @@ treina_usina <- function(
     ger_usi <- dt_ger_obs[id_usina == iu]    
 
     # Associa os dados NWP a usina, adiciona o passo de previsao e filtra usina atual
-    data_set_met <- lapply(data_set_met, associa_nwp_usina, dt_usinas = dt_usinas)
-    data_set_met <- lapply(data_set_met, interpola_previsao_nwp)
-    data_set_met <- lapply(data_set_met, adicionar_passo_previsao)
-    data_set_met <- lapply(data_set_met, function(dt) dt[id_usina == iu])
+    dt_prev <- lapply(dt_prev, associa_nwp_usina, dt_usinas = dt_usinas)
+    dt_prev <- lapply(dt_prev, interpola_previsao_nwp)
+    #dt_prev <- lapply(dt_prev, preenche_ausencia_previsao)
+    dt_prev <- lapply(dt_prev, adicionar_passo_previsao)    
+    dt_prev <- lapply(dt_prev, function(dt) dt[id_usina == iu])
 
     ger_usi[, hora_min := format(data_hora_observacao, "%H:%M")]
     prev_met_usi <- lapply(dt_prev, function(dt) {dt[, hora_min := format(data_hora_previsao, "%H:%M")]})
@@ -159,9 +160,52 @@ get_dataset <- function(args, conn) {
     return(out)
 }
 
-preenche_lacunas_previsao <- function(data_set) { # ISABELA - EM DESENVOLVIMENTO - NAO ESTA FUNCIONANDO
+#' Preenche Lacunas de Previsao
+#' 
+#' Identifica dias em que nao ha rodada do modelo meteorologico na base de dados e preenche as previsoes
+#' referentes a essa execucao ausente com NA. 
+#' A funcao avalia a coluna 'data_hora_rodada' de cada modelo meteorologico e, sendo verificada a 
+#' ausencia de alguma data, inclui dados NA para compatibilizacao das series temporais.
+#' 
+#' @param dt 'data.table' contendo as previsoes meteorologicas
+#' 
+#' @return 'data.table' com a coluna
+#' 
+preenche_ausencia_previsao <- function(dt) { # ISABELA - EM DESENVOLVIMENTO - NAO ESTA FUNCIONANDO
 
-    datas_rodadas <- unique(data_set$data_hora_rodada)
+    datas_execucao <- dt[, .(data_hora_rodada = unique(dt$data_hora_rodada)), by = .(id_modelo_nwp, id_usina)]
+    datas_completas <- dt[, .(data_hora_rodada = seq.POSIXt(from = min(data_hora_rodada), to = max(data_hora_rodada), by = "days")), by = .(id_modelo_nwp, id_usina)]
+
+    dt_data_inicio <- dt[, .(data_inicio = min(data_hora_previsao)), by = .(id_modelo_nwp, id_usina, data_hora_rodada)]
+    dt_data_fim <- dt[, .(data_fim = max(data_hora_previsao)), by = .(id_modelo_nwp, id_usina, data_hora_rodada)]
+    dt_datas_inicio_fim <- merge(dt_data_inicio, dt_data_fim, by = c("id_modelo_nwp", "id_usina", "data_hora_rodada"))
+    dt_datas_inicio_fim_completas <- merge(datas_completas, dt_datas_inicio_fim, by = c("id_modelo_nwp", "id_usina", "data_hora_rodada"), all.x = TRUE)
+    
+    # AVALIAR ESSA LOGICA
+    dt_datas_inicio_fim_completas[, data_inicio := nafill(seq.POSIXt(from = data_hora_rodada, length = 2, by = "days")[-1]), by = .(id_modelo_nwp, id_usina, data_hora_rodada)]
+    dt_datas_inicio_fim_completas[, data_fim := nafill(), by = .(id_modelo_nwp, id_usina, data_hora_rodada)]
+
+    cols_propagar <- setdiff(names(dt_datas_inicio_fim), names(datas_completas))
+    for (col in cols_propagar) {
+        if
+        dt_datas_inicio_fim_completas[, (col) := nafill(nafill(get(col), type = "locf"), type = "nocb"),
+            by = .(id_modelo_nwp, id_usina, data_hora_rodada)
+        ]
+    }
+}
+
+cria_dt_dummy <- function(datas_execucao_dummy, dt_original){
+    dt_dummy <- dt[id_modelo_nwp == datas_execucao_dummy$id_modelo_nwp &
+                    id_usina == datas_execucao_dummy$id_usina]
+
+    return(dt_dummy)
+}
+
+cria_dt_completo <- function(datas_faltantes, dt_original){
+
+    dt_auxiliar <- dt_original[id_modelo_nwp == datas_faltantes$id_modelo_nwp &
+                                id_usina == datas_faltantes$id_usina]
+    
 }
 
 compatibiliza_datas <- function(data_set) { # ISABELA - EM DESENVOLVIMENTO - NAO ESTA FUNCIONANDO
@@ -296,4 +340,9 @@ ajusta_arima <- function(dt, nlmod0) {
         auto.arima(dt$ger_N, allowdrift = FALSE, allowmean = FALSE),
         error = function(e) nlmod0
     )
+}
+
+teste <- function(dt, var){
+    dt[, variavel := var]
+    return(dt)
 }
