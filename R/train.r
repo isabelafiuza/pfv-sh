@@ -1,8 +1,8 @@
 train_main <- function(args) {
     conn <- conectamock_pfv(args$input)
-    
+
     data_fim_treino <- as.Date(args$data_referencia)
-    
+
     v_usinas <- args$ids_usinas
     v_horizonte <- args$horizonte_dias
     v_modelos_nwp <- args$modelos_NWP
@@ -28,21 +28,24 @@ train_main <- function(args) {
 }
 
 treina_usina <- function(
-    iu, dt_usinas, dt_ger_obs, dt_prev, v_modelos_nwp, v_horizonte, v_modelos_previsao, parametros_modelo_previsao, parametros_periodo_geracao, data_fim_treino) {
-    
+    iu, dt_usinas, dt_ger_obs, dt_prev, v_modelos_nwp,
+    v_horizonte, v_modelos_previsao, parametros_modelo_previsao,
+    parametros_periodo_geracao, data_fim_treino) {
     # Filtra os dados referentes a usina atual
     dad_usi <- dt_usinas[id_usina == iu]
-    ger_usi <- dt_ger_obs[id_usina == iu]    
+    ger_usi <- dt_ger_obs[id_usina == iu]
 
     # Associa os dados NWP a usina, adiciona o passo de previsao e filtra usina atual
     dt_prev <- lapply(dt_prev, associa_nwp_usina, dt_usinas = dt_usinas)
     dt_prev <- lapply(dt_prev, interpola_previsao_nwp)
-    #dt_prev <- lapply(dt_prev, preenche_ausencia_previsao)
-    dt_prev <- lapply(dt_prev, adicionar_passo_previsao)    
+    # dt_prev <- lapply(dt_prev, preenche_ausencia_previsao)
+    dt_prev <- lapply(dt_prev, adicionar_passo_previsao)
     dt_prev <- lapply(dt_prev, function(dt) dt[id_usina == iu])
 
     ger_usi[, hora_min := format(data_hora_observacao, "%H:%M")]
-    prev_met_usi <- lapply(dt_prev, function(dt) {dt[, hora_min := format(data_hora_previsao, "%H:%M")]})
+    prev_met_usi <- lapply(dt_prev, function(dt) {
+        dt[, hora_min := format(data_hora_previsao, "%H:%M")]
+    })
 
     # identificacao das semi-horas com geracao solar
     periodo_ger <- identifica_periodo_ger(dad_usi, ger_usi, fator_tol_ger = parametros_periodo_geracao$fator_tolerancia_limite_inferior_geracao, fator_tol_horas = parametros_periodo_geracao$percentual_dias_geracao)
@@ -51,15 +54,24 @@ treina_usina <- function(
     list_comb <- gera_combinacoes_modelo(v_modelos_nwp, v_horizonte, periodo_ger, v_modelos_previsao)
 
     # treina modelo
-    mod_aju <- lapply(list_comb, train_modelo, ger_usi = ger_usi, prev_met_usi = prev_met_usi, param_modelo_previsao = parametros_modelo_previsao)
+    mod_aju <- lapply(list_comb, train_modelo,
+        ger_usi = ger_usi,
+        prev_met_usi = prev_met_usi,
+        param_modelo_previsao = parametros_modelo_previsao,
+        data_fim_treino = data_fim_treino
+    )
     # TODO - alterar para salvar todos os modelos
     saveRDS(mod_aju, file = paste(args$output, paste0(iu, "_modelos_ajustados.rds"), sep = "/"))
 }
 
-train_modelo <- function(l, ger_usi, prev_met_usi, param_modelo_previsao){
-    modelo_despacho <- l$modelo_previsao
+train_modelo <- function(l, ger_usi, prev_met_usi, param_modelo_previsao, data_fim_treino) {
+    modelo_despacho <- l$modelo_prev
     modelo_parametros <- param_modelo_previsao[[modelo_despacho]]
-    nlmod <- parse_train(modelo_parametros, pars = l, ger_usi = ger_usi, prev_met_usi = prev_met_usi) # ISABELA - ONDE PAREI!! ARRUMAR ESSA CHAMADA
+    nlmod <- parse_train(modelo_parametros,
+        pars = l,
+        ger_usi = ger_usi,
+        prev_met_usi = prev_met_usi,
+        data_fim_treino = data_fim_treino) 
     list(
         combinacao_ajuste = l,
         modelo = nlmod
@@ -78,7 +90,9 @@ parse_train <- function(modelo_parametros, ...) UseMethod("parse_train")
 #'
 #' @return modelos ajustados
 #'
-parse_train.fisico_estimado <- function(modelo_parametros, pars, ger_usi, prev_met_usi){
+parse_train.fisico_estimado <- function(modelo_parametros, pars,
+                                        ger_usi, prev_met_usi,
+                                        data_fim_treino) {
     dt_treino <- filtra_dado_por_combinacao(pars, prev_met_usi, ger_usi)
 
     # seleciona janela dos dados para treinamento
@@ -113,11 +127,12 @@ aplica_regressao_linear <- function(dt_y, dt_x) {
     return(modelo)
 }
 
-parse_train.arimax <- function(modelo_parametros, pars, ger_usi, prev_met_usi, janela_dias) {
+parse_train.arimax <- function(modelo_parametros, pars,
+                               ger_usi, prev_met_usi, data_fim_treino) {
     dt_treino <- filtra_dado_por_combinacao(pars, prev_met_usi, ger_usi)
 
     # seleciona janela dos dados para treinamento
-    dt_treino_filt <- seleciona_janela(dt_treino, janela_dias_treinamento = modelo_parametros$n_dias_treino)
+    dt_treino_filt <- seleciona_janela(dt_treino, data_fim_treino, janela_dias_treinamento = modelo_parametros$n_dias_treino)
     setnames(dt_treino_filt, "valor", "ger_obs")
 
     # ajusta modelo dummy
@@ -161,7 +176,6 @@ parse_train.arimax <- function(modelo_parametros, pars, ger_usi, prev_met_usi, j
 #' @return lista contendo o dataset
 #'
 get_dataset <- function(args, conn) {
-
     ger_obs <- get_geracao_observada(conn, id_usina = args$ids_usinas)
     irrad_prev <- get_irradiancia_prevista(conn, id_usina = args$ids_usinas, id_modelo_nwp = args$modelos_NWP)
 
@@ -172,16 +186,16 @@ get_dataset <- function(args, conn) {
 }
 
 #' Preenche Lacunas de Previsao
-#' 
+#'
 #' Identifica dias em que nao ha rodada do modelo meteorologico na base de dados e preenche as previsoes
-#' referentes a essa execucao ausente com NA. 
-#' A funcao avalia a coluna 'data_hora_rodada' de cada modelo meteorologico e, sendo verificada a 
+#' referentes a essa execucao ausente com NA.
+#' A funcao avalia a coluna 'data_hora_rodada' de cada modelo meteorologico e, sendo verificada a
 #' ausencia de alguma data, inclui dados NA para compatibilizacao das series temporais.
-#' 
+#'
 #' @param dt 'data.table' contendo as previsoes meteorologicas
-#' 
+#'
 #' @return 'data.table' com a coluna
-#' 
+#'
 preenche_ausencia_previsao <- function(dt) { # ISABELA - EM DESENVOLVIMENTO - NAO ESTA FUNCIONANDO
 
     datas_execucao <- dt[, .(data_hora_rodada = unique(dt$data_hora_rodada)), by = .(id_modelo_nwp, id_usina)]
@@ -191,32 +205,30 @@ preenche_ausencia_previsao <- function(dt) { # ISABELA - EM DESENVOLVIMENTO - NA
     dt_data_fim <- dt[, .(data_fim = max(data_hora_previsao)), by = .(id_modelo_nwp, id_usina, data_hora_rodada)]
     dt_datas_inicio_fim <- merge(dt_data_inicio, dt_data_fim, by = c("id_modelo_nwp", "id_usina", "data_hora_rodada"))
     dt_datas_inicio_fim_completas <- merge(datas_completas, dt_datas_inicio_fim, by = c("id_modelo_nwp", "id_usina", "data_hora_rodada"), all.x = TRUE)
-    
+
     # AVALIAR ESSA LOGICA
     dt_datas_inicio_fim_completas[, data_inicio := nafill(seq.POSIXt(from = data_hora_rodada, length = 2, by = "days")[-1]), by = .(id_modelo_nwp, id_usina, data_hora_rodada)]
     dt_datas_inicio_fim_completas[, data_fim := nafill(), by = .(id_modelo_nwp, id_usina, data_hora_rodada)]
 
     cols_propagar <- setdiff(names(dt_datas_inicio_fim), names(datas_completas))
     for (col in cols_propagar) {
-        if
+        # if
         dt_datas_inicio_fim_completas[, (col) := nafill(nafill(get(col), type = "locf"), type = "nocb"),
             by = .(id_modelo_nwp, id_usina, data_hora_rodada)
         ]
     }
 }
 
-cria_dt_dummy <- function(datas_execucao_dummy, dt_original){
+cria_dt_dummy <- function(datas_execucao_dummy, dt_original) {
     dt_dummy <- dt[id_modelo_nwp == datas_execucao_dummy$id_modelo_nwp &
-                    id_usina == datas_execucao_dummy$id_usina]
+        id_usina == datas_execucao_dummy$id_usina]
 
     return(dt_dummy)
 }
 
-cria_dt_completo <- function(datas_faltantes, dt_original){
-
+cria_dt_completo <- function(datas_faltantes, dt_original) {
     dt_auxiliar <- dt_original[id_modelo_nwp == datas_faltantes$id_modelo_nwp &
-                                id_usina == datas_faltantes$id_usina]
-    
+        id_usina == datas_faltantes$id_usina]
 }
 
 compatibiliza_datas <- function(data_set) { # ISABELA - EM DESENVOLVIMENTO - NAO ESTA FUNCIONANDO
@@ -399,7 +411,7 @@ calcula_erros <- function(dt, nlmod1, nlmod2) {
     # filtra valores nao-NA coincidentes de geracao e variaveis exogenas
     var_exog <- setdiff(names(dt), "ger_obs_norm")
     dt_valido <- dt[complete.cases(dt[, c("ger_obs_norm", ..var_exog)])]
-    
+
     list(
         erro1 = mean(abs(y_validos - prev1), na.rm = TRUE),
         erro2 = mean(abs(dt_valido$ger_obs_norm - prev2), na.rm = TRUE)
