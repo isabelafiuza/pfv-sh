@@ -1,18 +1,18 @@
-mod_aju <- readRDS(paste(args$output, "BAUFI1_arima_ajustado.rds", sep = "/"))
+mod_aju <- readRDS(paste(args$output, "BAUFI1_modelos_ajustados.rds", sep = "/"))
 
 predict_main <- function(args) {
     conn <- conectamock_pfv(args$input)
 
     v_usinas <- args$ids_usinas
     v_horizonte <- args$horizonte_dias
-    v_modelos_nwp <- args$modelos_NWP
+    # v_modelos_nwp <- args$modelos_NWP
 
     # define horizonte de previsao
     data_prev <- define_hor_prev(args$data_referencia, v_horizonte)
 
     dt_usinas <- get_usinas(conn, id_usina = v_usinas)
 
-    data_set <- get_dataset(args, conn, dias = 180)
+    data_set <- get_dataset(args, conn)
 
     data_set_ger <- data_set$ger_obs
     data_set_met <- data_set[names(data_set) != "ger_obs"]
@@ -26,18 +26,15 @@ predict_main <- function(args) {
         dt_usinas = dt_usinas,
         dt_ger_obs = data_set_ger,
         dt_prev = data_set_met,
-        fator_tolerancia_geracao = args$fator_tolerancia_limite_inferior_geracao,
-        fator_tolerancia_horas = args$percentual_dias_geracao,
-        v_modelos_nwp = v_modelos_nwp,
-        v_horizonte = v_horizonte,
+        parametros_modelo_previsao = args$modelos_previsao,
+        parametros_periodo_geracao = args$parametros_periodo_geracao,
         data_prev = data_prev
     )
 }
 
 predict_usina <- function(
-    iu, dt_usinas, dt_ger_obs, dt_prev,
-    fator_tolerancia_geracao, fator_tolerancia_horas,
-    v_modelos_nwp, v_horizonte, data_prev) {
+    iu, dt_usinas, dt_ger_obs, dt_prev, parametros_modelo_previsao,
+    parametros_periodo_geracao, data_prev) {
     # Filtra os dados de geracao e meteorologicos referentes a usina atual
     dad_usi <- dt_usinas[id_usina == iu]
     ger_usi <- dt_ger_obs[id_usina == iu]
@@ -48,29 +45,17 @@ predict_usina <- function(
         dt[, hora_min := format(data_hora_previsao, "%H:%M")]
     })
 
-    # identificacao das semi-horas com geracao solar
-    periodo_ger <- identifica_periodo_ger(dad_usi, ger_usi, fator_tolerancia_geracao, fator_tolerancia_horas)
 
-    # gera lista com as combinacoes nwp x passo de previsao x meia-hora
-    list_comb <- gera_combinacoes_modelo(v_modelos_nwp, v_horizonte, periodo_ger)
+    ger_prev <- lapply(seq_along(mod_aju), function(i) {
+        pars <- mod_aju[[i]]$combinacao_ajuste
 
-    # treina o arima
-    janela_dias_modelo <- 365
+        modelo_despacho <- pars$modelo_prev
+        modelo_parametros <- param_modelo_previsao[[modelo_despacho]]
 
-    ger_prev <- lapply(seq_along(list_comb), function(i) {
-        pars <- list_comb[[i]]
-
-        idx <- which(sapply(mod_aju, function(x) {
-            x$combinacao_ajuste$id_modelo_nwp == pars$id_modelo_nwp &
-                x$combinacao_ajuste$hora_min == pars$hora_min &
-                x$combinacao_ajuste$horiz_prev == pars$horiz_prev
-        }))
-
-        if (length(idx) == 0) {
-            return(NULL)
-        }
-
-        prev <- predict_arima(mod_aju[[idx]]$modelo, pars, data_prev, ger_usi, prev_met_usi, janela_dias_modelo)
+        prev <- parse_predict(
+            mod_aju[[i]]$modelo, pars, data_prev,
+            ger_usi, prev_met_usi, modelo_parametros
+        )
         list(
             combinacao_ajuste = pars,
             prev = prev
@@ -78,7 +63,11 @@ predict_usina <- function(
     })
 }
 
-predict_arima <- function(mod_aju_comb, pars, data_prev, ger_usi, prev_met_usi, janela_dias) {
+parse_predict <- function(modelo, ...) UseMethod("parse_predict")
+
+parse_predict.arimax <- function(
+    modelo, pars, data_prev, ger_usi,
+    prev_met_usi, modelo_parametros) {
     dt_filt <- filtra_dado_por_combinacao(pars, prev_met_usi, ger_usi)
 
     # Separa os dados de geracao e meteorologicos em treino e previsao -
@@ -89,7 +78,7 @@ predict_arima <- function(mod_aju_comb, pars, data_prev, ger_usi, prev_met_usi, 
     setnames(dt_prev_filt, "valor", "ger_obs")
 
     # seleciona janela dos dados para treinamento
-    dt_treino_filt <- seleciona_janela(dt_treino_filt, janela_dias_treinamento = 300)
+    dt_treino_filt <- seleciona_janela(dt_treino_filt, data_prev, janela_dias_treinamento = modelo_parametros$n_dias_treino)
     setnames(dt_treino_filt, "valor", "ger_obs")
 
     # avalia numero de conjuntos ger x irr x temp x umid
@@ -106,6 +95,9 @@ predict_arima <- function(mod_aju_comb, pars, data_prev, ger_usi, prev_met_usi, 
 
         # normaliza dados previstos com base nas estatisticas de treino
         dt_prev_norm <- copy(dt_prev_filt)
+        dt_prev_norm[, data_hora := NULL]
+        names(dt_prev_norm) <- cols_norm 
+
         for (i in seq_len(nrow(stats_norm))) {
             var <- stats_norm$variavel[i]
             if (var %in% names(dt_prev_norm)) {
@@ -118,14 +110,14 @@ predict_arima <- function(mod_aju_comb, pars, data_prev, ger_usi, prev_met_usi, 
         var_exog <- setdiff(names(dt_prev_norm), "ger_obs_norm")
 
         # recalibra modelo Arima/Arimax e realiza previsao
-        mod_selec <- mod_aju_comb$modelo_escolhido
+        mod_selec <- modelo$modelo_escolhido
         if (mod_selec == "ARIMAX") {
-            nlmod1 <- recalibra_arimax(dt_treino_norm, mod_aju_comb$modelo_final)
+            nlmod1 <- recalibra_arimax(dt_treino_norm, modelo$modelo_final)
 
             xreg_fut <- as.matrix(dt_prev_norm[, ..var_exog])
             prev_norm <- forecast(nlmod1, xreg = xreg_fut, h = nrow(dt_prev_norm))$mean
         } else {
-            nlmod1 <- recalibra_arima(dt_treino_norm, mod_aju_comb$modelo_final)
+            nlmod1 <- recalibra_arima(dt_treino_norm, modelo$modelo_final)
 
             prev_norm <- forecast(nlmod1, h = nrow(dt_prev_norm))$mean
         }
@@ -188,6 +180,6 @@ desnormaliza_variaveis <- function(dt, stats_norm) {
         desvio <- stats_norm[variavel == var, sd]
         dt_out[, (var) := get(names(dt_out)) * desvio + media]
     }
-    
+
     return(dt_out)
 }
