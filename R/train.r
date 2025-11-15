@@ -36,6 +36,7 @@ treina_usina <- function(
     ger_usi <- dt_ger_obs[id_usina == iu]
 
     # Associa os dados NWP a usina, adiciona o passo de previsao e filtra usina atual
+    dt_prev <- lapply(dt_prev, function(dt) dt[id_modelo_nwp %in% v_modelos_nwp])
     dt_prev <- lapply(dt_prev, associa_nwp_usina, dt_usinas = dt_usinas)
     dt_prev <- lapply(dt_prev, interpola_previsao_nwp)
     # dt_prev <- lapply(dt_prev, preenche_ausencia_previsao)
@@ -194,73 +195,58 @@ get_dataset <- function(args, conn) {
 #'
 #' @param dt 'data.table' contendo as previsoes meteorologicas
 #'
-#' @return 'data.table' com a coluna
+#' @return 'data.table' contendo as previsoes com datas de execucao do modelo meteorologico completas
 #'
-preenche_ausencia_previsao <- function(dt) { # ISABELA - EM DESENVOLVIMENTO - NAO ESTA FUNCIONANDO
+preenche_ausencia_previsao <- function(dt) {
 
-    datas_execucao <- dt[, .(data_hora_rodada = unique(dt$data_hora_rodada)), by = .(id_modelo_nwp, id_usina)]
+    dt <- copy(dt_prev[[2]])
+    datas_execucao <- dt[, .(data_hora_rodada = unique(data_hora_rodada)), by = .(id_modelo_nwp,id_usina)]
     datas_completas <- dt[, .(data_hora_rodada = seq.POSIXt(from = min(data_hora_rodada), to = max(data_hora_rodada), by = "days")), by = .(id_modelo_nwp, id_usina)]
+    dif <- fsetdiff(datas_completas, datas_execucao)
 
-    dt_data_inicio <- dt[, .(data_inicio = min(data_hora_previsao)), by = .(id_modelo_nwp, id_usina, data_hora_rodada)]
-    dt_data_fim <- dt[, .(data_fim = max(data_hora_previsao)), by = .(id_modelo_nwp, id_usina, data_hora_rodada)]
-    dt_datas_inicio_fim <- merge(dt_data_inicio, dt_data_fim, by = c("id_modelo_nwp", "id_usina", "data_hora_rodada"))
-    dt_datas_inicio_fim_completas <- merge(datas_completas, dt_datas_inicio_fim, by = c("id_modelo_nwp", "id_usina", "data_hora_rodada"), all.x = TRUE)
+    if(length(dif) == 0) return(dt)
 
-    # AVALIAR ESSA LOGICA
-    dt_datas_inicio_fim_completas[, data_inicio := nafill(seq.POSIXt(from = data_hora_rodada, length = 2, by = "days")[-1]), by = .(id_modelo_nwp, id_usina, data_hora_rodada)]
-    dt_datas_inicio_fim_completas[, data_fim := nafill(), by = .(id_modelo_nwp, id_usina, data_hora_rodada)]
+    passos_inicio <- dt[,  min(data_hora_previsao) - data_hora_rodada, by = .(id_modelo_nwp, data_hora_rodada)]
+    setnames(passos_inicio, "V1", "passos_inicio")  
+    passos_fim <- dt[,  max(data_hora_previsao) - min(data_hora_previsao), by = .(id_modelo_nwp, data_hora_rodada)]                
+    setnames(passos_fim, "V1", "passos_fim")  
+    n_passos_previsao <- merge(passos_inicio, passos_fim, by = c("id_modelo_nwp", "data_hora_rodada"))
+    n_passos_previsao <- n_passos_previsao[, lapply(.SD, unique),
+                                                .SDcols =c("passos_inicio", "passos_fim"), by = id_modelo_nwp]  
 
-    cols_propagar <- setdiff(names(dt_datas_inicio_fim), names(datas_completas))
-    for (col in cols_propagar) {
-        # if
-        dt_datas_inicio_fim_completas[, (col) := nafill(nafill(get(col), type = "locf"), type = "nocb"),
-            by = .(id_modelo_nwp, id_usina, data_hora_rodada)
-        ]
-    }
+    dif <- merge(dif, n_passos_previsao, by = "id_modelo_nwp")
+    
+    l_datas_faltantes <- lapply(split(dif, seq_len(nrow(dif))), cria_dt_dummy, dt_completo = dt)
+    dt_datas_faltantes <- rbindlist(l_datas_faltantes)
+
+    dt_prev_completo <- rbindlist(list(dt,dt_datas_faltantes))
+    setorder(dt_prev_completo, id_modelo_nwp, id_usina, data_hora_rodada, data_hora_previsao)
+
+    return(dt_prev_completo)    
 }
 
-cria_dt_dummy <- function(datas_execucao_dummy, dt_original) {
-    dt_dummy <- dt[id_modelo_nwp == datas_execucao_dummy$id_modelo_nwp &
-        id_usina == datas_execucao_dummy$id_usina]
+#' Cria Data.table Auxiliar
+#' 
+#' Auxiliar da funcao ´preenche_ausencia_previsao´. Cria um ´data.table´ auxiliar
+#' com as datas ausentes nos dados originais de previsao meteorologica. As previsoes meteorologicas
+#' para essas datas sao preenchidas com ´NA´.
+#'
+#' @param dif  ´data.table´ contendo a data ausente nos dados de previsao numerica para a qual se deseja
+#' criar o data.table de previsoes NA. Contem tambem as demais informacoes necessaria para criar o
+#' @return ´data.table´ nor formato adequado para inclusao nos dados de previsao meteorologica a ser usado
+#' 
+cria_dt_dummy <- function(dif, dt_completo) {
+    latitude <- unique(dt_completo[id_modelo_nwp == dif$id_modelo_nwp & id_usina == dif$id_usina, latitude])
+    longitude <- unique(dt_completo[id_modelo_nwp == dif$id_modelo_nwp & id_usina == dif$id_usina, longitude])
+    data_hora_previsao_ini <- dif$data_hora_rodada + dif$passos_inicio
+    data_hora_previsao_fim <- data_hora_previsao_ini + dif$passos_fim
+    seq_data_hora_previsao <- seq.POSIXt(from = data_hora_previsao_ini, to = data_hora_previsao_fim,
+                                        by = "30 min")
+    dt_dummy <- data.table(id_modelo_nwp = dif$id_modelo_nwp, id_usina = dif$id_usina, latitude = latitude,
+                            longitude = longitude, data_hora_rodada = dif$data_hora_rodada, data_hora_previsao = seq_data_hora_previsao,
+                            valor = NA)
 
     return(dt_dummy)
-}
-
-cria_dt_completo <- function(datas_faltantes, dt_original) {
-    dt_auxiliar <- dt_original[id_modelo_nwp == datas_faltantes$id_modelo_nwp &
-        id_usina == datas_faltantes$id_usina]
-}
-
-compatibiliza_datas <- function(data_set) { # ISABELA - EM DESENVOLVIMENTO - NAO ESTA FUNCIONANDO
-
-    ger_obs <- data_set$ger_obs
-    ger_obs_colorder <- names(ger_obs)
-
-    irrad_prev <- data_set$irrad_prev
-    irrad_prev_colorder <- names(irrad_prev)
-
-    data_ini <- max(min(ger_obs$data_hora_observacao), min(irrad_prev$data_hora_rodada))
-    data_fim <- min(max(ger_obs$data_hora_observacao), max(irrad_prev$data_hora_previsao))
-    janela <- seq.POSIXt(from = data_ini, to = data_fim, by = "30 min")
-
-    dt_janela <- data.table(data_hora_observacao = janela)
-    ger_obs <- merge(ger_obs, dt_janela, by = "data_hora_observacao", all.y = TRUE)
-    setcolorder(ger_obs, ger_obs_colorder)
-
-    names(dt_janela) <- "data_hora_previsao"
-    irrad_prev <- merge(irrad_prev, dt_janela, by = "data_hora_previsao", all.y = TRUE)
-    setorder(irrad_prev, data_hora_rodada, data_hora_previsao)
-    setcolorder(irrad_prev, irrad_prev_colorder)
-
-    data_set$ger_obs <- ger_obs
-    data_set$irrad_prev <- irrad_prev
-
-    return(data_set)
-}
-
-renomeia_colunas <- function(dt, nome_atual, nome_novo) {
-    names(dt)[names(dt) == nome_atual] <- nome_novo
-    return(dt)
 }
 
 #' Seleciona janela dos dados para treinamento
