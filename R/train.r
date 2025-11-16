@@ -39,7 +39,7 @@ treina_usina <- function(
     dt_prev <- lapply(dt_prev, function(dt) dt[id_modelo_nwp %in% v_modelos_nwp])
     dt_prev <- lapply(dt_prev, associa_nwp_usina, dt_usinas = dt_usinas)
     dt_prev <- lapply(dt_prev, interpola_previsao_nwp)
-    # dt_prev <- lapply(dt_prev, preenche_ausencia_previsao)
+    dt_prev <- lapply(dt_prev, preenche_ausencia_previsao)
     dt_prev <- lapply(dt_prev, adicionar_passo_previsao)
     dt_prev <- lapply(dt_prev, function(dt) dt[id_usina == iu])
 
@@ -96,14 +96,45 @@ parse_train.fisico_estimado <- function(modelo_parametros, pars,
                                         data_fim_treino) {
     dt_treino <- filtra_dado_por_combinacao(pars, prev_met_usi, ger_usi)
 
-    # seleciona janela dos dados para treinamento
-    dt_treino_filt <- seleciona_janela(dt_treino, janela_dias_treinamento = modelo_parametros$n_dias_treino)
-    setnames(dt_treino_filt, "valor", "ger_obs")
+    aumento <- 0 # variavel usada para auxiliar no aumento de amostra, caso necessario
+    repeat{
+        # seleciona janela dos dados para treinamento
+        dt_treino_filt <- seleciona_janela(dt_treino, data_ref = data_fim_treino, janela_dias_treinamento = modelo_parametros$n_dias_treino + aumento)
+        setnames(dt_treino_filt, "valor", "ger_obs")
 
-    dt_y <- dt_treino_filt$ger_obs
-    dt_x <- dt_treino_filt[names(dt_treino_filt) != "ger_obs"]
+        # avalia numero de conjuntos ger x irr x temp x umid
+        if (dados_suficientes(dt_treino_filt, num_min_dados = 10) == TRUE){
 
-    modelo <- aplica_regressao_linear(dt_y, dt_x)
+            # define modelo dummy
+            nlmod0 <- 0
+        
+            # ajusta RLS
+            dt_y <- dt_treino_filt[, .(ger_obs)]
+            dt_x <- dt_treino_filt[, .(irrad_prev)]
+            nlmod1 <- aplica_regressao_linear(dt_y = dt_y, dt_x = dt_x)
+
+            # ajusta RLM
+            dt_y <- dt_treino_filt[, .(ger_obs)]
+            cols <- setdiff(names(dt_treino_filt)[-1],names(dt_y))
+            dt_x <- dt_treino_filt[, .SD, .SDcols = cols]
+            nlmod2 <- aplica_regressao_linear(dt_y = dt_y, dt_x = dt_x)
+
+            # condicao de parada
+            if ((nlmod1$coefficients[2] > 0 & nlmod2$coefficients[2] > 0) | aumento == 200) {
+                break
+            }
+            aumento <- aumento + 10
+        }else{
+            aumento <- aumento + 10
+        }
+    }
+    # calcula erro medio in-sample
+    erros <- calcula_erros_fisico_estimado(dt = dt_treino_filt[,-1], nlmod1, nlmod2)
+
+    # seleciona modelo
+    selecao <- seleciona_modelo_fisico_estimado(nlmod1, nlmod2, erros)
+
+    # cria diferenciacao para alguns horarios dias para que o ajuste seja apenas ger x irr
 }
 
 #' Aplica Regressao Linear
@@ -124,7 +155,10 @@ aplica_regressao_linear <- function(dt_y, dt_x) {
     formula <- paste(resposta, "~", paste(preditoras, collapse = "+"))
     formula_objeto <- as.formula(formula)
 
-    modelo <- lm(formula_objeto, data = dados)
+    modelo <- tryCatch(
+        lm(formula_objeto, data = dados),
+        error = function(e) nlmod0
+    )
     return(modelo)
 }
 
@@ -198,8 +232,6 @@ get_dataset <- function(args, conn) {
 #' @return 'data.table' contendo as previsoes com datas de execucao do modelo meteorologico completas
 #'
 preenche_ausencia_previsao <- function(dt) {
-
-    dt <- copy(dt_prev[[2]])
     datas_execucao <- dt[, .(data_hora_rodada = unique(data_hora_rodada)), by = .(id_modelo_nwp,id_usina)]
     datas_completas <- dt[, .(data_hora_rodada = seq.POSIXt(from = min(data_hora_rodada), to = max(data_hora_rodada), by = "days")), by = .(id_modelo_nwp, id_usina)]
     dif <- fsetdiff(datas_completas, datas_execucao)
@@ -216,7 +248,7 @@ preenche_ausencia_previsao <- function(dt) {
 
     dif <- merge(dif, n_passos_previsao, by = "id_modelo_nwp")
     
-    l_datas_faltantes <- lapply(split(dif, seq_len(nrow(dif))), cria_dt_dummy, dt_completo = dt)
+    l_datas_faltantes <- lapply(split(dif, seq_len(nrow(dif))), cria_dt_auxiliar, dt_completo = dt)
     dt_datas_faltantes <- rbindlist(l_datas_faltantes)
 
     dt_prev_completo <- rbindlist(list(dt,dt_datas_faltantes))
@@ -235,18 +267,18 @@ preenche_ausencia_previsao <- function(dt) {
 #' criar o data.table de previsoes NA. Contem tambem as demais informacoes necessaria para criar o
 #' @return ´data.table´ nor formato adequado para inclusao nos dados de previsao meteorologica a ser usado
 #' 
-cria_dt_dummy <- function(dif, dt_completo) {
+cria_dt_auxiliar <- function(dif, dt_completo) {
     latitude <- unique(dt_completo[id_modelo_nwp == dif$id_modelo_nwp & id_usina == dif$id_usina, latitude])
     longitude <- unique(dt_completo[id_modelo_nwp == dif$id_modelo_nwp & id_usina == dif$id_usina, longitude])
     data_hora_previsao_ini <- dif$data_hora_rodada + dif$passos_inicio
     data_hora_previsao_fim <- data_hora_previsao_ini + dif$passos_fim
     seq_data_hora_previsao <- seq.POSIXt(from = data_hora_previsao_ini, to = data_hora_previsao_fim,
                                         by = "30 min")
-    dt_dummy <- data.table(id_modelo_nwp = dif$id_modelo_nwp, id_usina = dif$id_usina, latitude = latitude,
+    dt_auxiliar <- data.table(id_modelo_nwp = dif$id_modelo_nwp, id_usina = dif$id_usina, latitude = latitude,
                             longitude = longitude, data_hora_rodada = dif$data_hora_rodada, data_hora_previsao = seq_data_hora_previsao,
                             valor = NA)
 
-    return(dt_dummy)
+    return(dt_auxiliar)
 }
 
 #' Seleciona janela dos dados para treinamento
@@ -261,7 +293,7 @@ seleciona_janela <- function(dt, data_ref, janela_dias_treinamento) {
     dt <- copy(dt)
     dt[, data := as.Date(data_hora)]
 
-    dt[data < data_ref]
+    dt <- dt[data < data_ref]
 
     # considerar apenas as ultimas `janela_dias` datas
     ultimas_datas <- head(sort(unique(dt$data), decreasing = TRUE), janela_dias_treinamento)
@@ -404,6 +436,33 @@ calcula_erros <- function(dt, nlmod1, nlmod2) {
     )
 }
 
+#' Calcula erros medios in-sample dos modelos
+#'
+#' @param dt data.table com variável \code{ger_obs_norm}, \code{irrad_prev_norm},
+#' \code{temp_prev_norm} e \code{umid_prev_norm}..
+#' @param nlmod1 Modelo 1
+#' @param nlmod2 Modelo 2
+#'
+#' @return Lista com erro médio de cada modelo.
+calcula_erros_fisico_estimado <- function(dt, nlmod1, nlmod2) {
+    prev1 <- as.numeric(fitted(nlmod1))
+    prev2 <- as.numeric(fitted(nlmod2))
+
+    # filtra valores de geracao nao-NA
+    # col_ger <- names(dt)[grep("ger_obs", names(dt))]
+    # y <- dt[[col_ger]]
+    # y_validos <- y[!is.na(y)]
+
+    # # filtra valores nao-NA coincidentes de geracao e variaveis exogenas
+    # var_exog <- setdiff(names(dt), col_ger)
+    dt_valido <- dt[complete.cases(dt)]
+
+    l_erros <- list(erro1 = mean(abs(dt_valido$ger_obs - prev1), na.rm = TRUE),
+                    erro2 = mean(abs(dt_valido$ger_obs - prev2), na.rm = TRUE)
+                    )
+    return(l_erros)
+}
+
 #' Seleciona o melhor modelo entre ARIMA e ARIMAX
 #'
 #' @param nlmod1 Modelo ARIMA.
@@ -418,3 +477,20 @@ seleciona_modelo <- function(nlmod1, nlmod2, erros) {
         modelo_final = if (escolhe_arima) nlmod1 else nlmod2
     )
 }
+
+#' Seleciona o melhor modelo entre Regressao Linear Simples (RLS) e Regressao Linear Multipla (RLM)
+#'
+#' @param nlmod1 Modelo RLS
+#' @param nlmod2 Modelo RLM
+#' @param erros Lista com erros medios dos modelos.
+#'
+#' @return Lista com modelo escolhido.
+seleciona_modelo_fisico_estimado <- function(nlmod1, nlmod2, erros) {    
+    escolhe_fe <- (erros$erro1 <= erros$erro2)
+    list(
+        modelo_escolhido = if (escolhe_fe) "RLS" else "RLM",
+        modelo_final = if (escolhe_fe) nlmod1 else nlmod2,
+        variaveis_usadas = if(escolhe_fe) names(nlmod1$model) else names(nlmod2$model) # ISABELA - ARRUMAR
+    )
+}
+
