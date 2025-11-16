@@ -244,11 +244,12 @@ identifica_periodo_ger <- function(dad_usina, ger_usi, fator_tol_ger, fator_tol_
 #' v_horiz <- c("D+0", "D+1")
 #' v_hor_ger <- c("12:00", "12:30")
 #' gera_combinacoes_modelo(v_nwp, v_horiz, v_hor_ger)
-gera_combinacoes_modelo <- function(v_modelos_nwp, v_horizonte, periodo_ger) {
+gera_combinacoes_modelo <- function(v_modelos_nwp, v_horizonte, periodo_ger, v_modelos_previsao) {
     comb <- CJ(
         id_modelo_nwp = unlist(v_modelos_nwp),
         horiz_prev = v_horizonte,
-        hora_min = periodo_ger
+        hora_min = periodo_ger,
+        modelo_prev = v_modelos_previsao
     )
 
     lista_comb <- split(comb, seq_len(nrow(comb)))
