@@ -65,30 +65,7 @@ predict_usina <- function(
                         prev_met_usi = prev_met_usi,
                         param_modelo_previsao = parametros_modelo_previsao,                        
                         list_modelos_previsao = list_modelos_previsao,
-                        data_prev = data_prev,)
-
-    # treina o arima
-    # janela_dias_modelo <- 365
-
-    # ger_prev <- lapply(seq_along(list_comb), function(i) {
-    #     pars <- list_comb[[i]]
-
-    #     idx <- which(sapply(mod_aju, function(x) {
-    #         x$combinacao_ajuste$id_modelo_nwp == pars$id_modelo_nwp &
-    #             x$combinacao_ajuste$hora_min == pars$hora_min &
-    #             x$combinacao_ajuste$horiz_prev == pars$horiz_prev
-    #     }))
-
-    #     if (length(idx) == 0) {
-    #         return(NULL)
-    #     }
-
-    #     prev <- predict_arima(mod_aju[[idx]]$modelo, pars, data_prev, ger_usi, prev_met_usi, janela_dias_modelo)
-    #     list(
-    #         combinacao_ajuste = pars,
-    #         prev = prev
-    #     )
-    # })
+                        data_prev = data_prev)    
 }
 
 predict_modelo <- function(l, ger_usi, prev_met_usi, param_modelo_previsao, list_modelos_previsao, data_prev){
@@ -181,9 +158,26 @@ parse_predict.arima <- function(modelo_parametros, mod_aju_comb, pars, data_prev
     }
 }
 
-# parse_predict.fisico_estimado <- function(){
-    
-# }
+parse_predict.fisico_estimado <- function(modelo_parametros, mod_aju_comb, pars){
+    dt_filt <- filtra_dado_por_combinacao(pars, prev_met_usi, ger_usi)
+
+    # separa as variaveis meteorologicas previstas para aplicacao no modelo
+    pos_hor <- which(v_horizonte == pars$horiz_prev)
+    dt_prev_filt <- dt_filt[as.Date(data_hora) == data_prev[pos_hor]]
+    setnames(dt_prev_filt, "valor", "ger_obs")
+
+    # obtem modelo
+    nlmod <- mod_aju_comb$modelo_final
+    variaveis_usadas <- mod_aju_comb$variaveis_usadas
+    cols <- names(dt_prev_filt)[names(dt_prev_filt) %in% variaveis_usadas]
+    variaveis_previstas <- dt_prev_filt[, .SD, .SDcols = cols]
+
+    # gera previsao
+    dt_prev <- predict(nlmod, variaveis_previstas, interval = "prediction")
+    dt_prev_out <- dt_prev$fit
+
+    return(dt_prev_out)    
+}
 
 # AUXILIARES ---------------------------------------------------------------------------------------
 
