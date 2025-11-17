@@ -95,6 +95,7 @@ parse_train.fisico_estimado <- function(modelo_parametros, pars,
                                         ger_usi, prev_met_usi,
                                         data_fim_treino) {
     dt_treino <- filtra_dado_por_combinacao(pars, prev_met_usi, ger_usi)
+    dt_treino <- elimina_dados_invalidos(dt_treino)
 
     aumento <- 0 # variavel usada para auxiliar no aumento de amostra, caso necessario
     repeat{
@@ -102,22 +103,26 @@ parse_train.fisico_estimado <- function(modelo_parametros, pars,
         dt_treino_filt <- seleciona_janela(dt_treino, data_ref = data_fim_treino, janela_dias_treinamento = modelo_parametros$n_dias_treino + aumento)
         setnames(dt_treino_filt, "valor", "ger_obs")
 
+        # ajusta dummy
+        dt_y <- data.table(ger_obs = rep(0, nrow(dt_treino_filt)))
+        dt_x <- data.table(irrad_prev = rep(0, nrow(dt_treino_filt)))
+        nlmod0 <- aplica_regressao_linear(dt_y = dt_y, dt_x = dt_x)
+        nlmod0$coefficients[is.na(nlmod0$coefficients)] <- 0
+
         # avalia numero de conjuntos ger x irr x temp x umid
         if (dados_suficientes(dt_treino_filt, num_min_dados = 10) == TRUE){
-
-            # define modelo dummy
-            nlmod0 <- 0
-        
             # ajusta RLS
             dt_y <- dt_treino_filt[, .(ger_obs)]
             dt_x <- dt_treino_filt[, .(irrad_prev)]
-            nlmod1 <- aplica_regressao_linear(dt_y = dt_y, dt_x = dt_x)
+            nlmod1 <- aplica_regressao_linear(dt_y = dt_y, dt_x = dt_x, nlmod0 = nlmod0)
+            nlmod1$coefficients[is.na(nlmod1$coefficients)] <- 0
 
             # ajusta RLM
             dt_y <- dt_treino_filt[, .(ger_obs)]
             cols <- setdiff(names(dt_treino_filt)[-1],names(dt_y))
             dt_x <- dt_treino_filt[, .SD, .SDcols = cols]
-            nlmod2 <- aplica_regressao_linear(dt_y = dt_y, dt_x = dt_x)
+            nlmod2 <- aplica_regressao_linear(dt_y = dt_y, dt_x = dt_x, nlmod0 = nlmod0)
+            nlmod2$coefficients[is.na(nlmod2$coefficients)] <- 0
 
             # condicao de parada
             if ((nlmod1$coefficients[2] > 0 & nlmod2$coefficients[2] > 0) | aumento == 200) {
@@ -125,9 +130,15 @@ parse_train.fisico_estimado <- function(modelo_parametros, pars,
             }
             aumento <- aumento + 10
         }else{
+            if(aumento == 200){                
+                nlmod1 <- nlmod0
+                nlmod2 <- nlmod0
+                break
+            }
             aumento <- aumento + 10
         }
     }
+
     # calcula erro medio in-sample
     erros <- calcula_erros_fisico_estimado(dt = dt_treino_filt[,-1], nlmod1, nlmod2)
 
@@ -148,7 +159,7 @@ parse_train.fisico_estimado <- function(modelo_parametros, pars,
 #'
 #' @return modelos ajustados
 #'
-aplica_regressao_linear <- function(dt_y, dt_x) {
+aplica_regressao_linear <- function(dt_y, dt_x, nlmod0) {
     dados <- cbind(dt_y, dt_x)
     resposta <- names(dt_y)
     preditoras <- names(dt_x)
@@ -282,6 +293,23 @@ cria_dt_auxiliar <- function(dif, dt_completo) {
     return(dt_auxiliar)
 }
 
+#' Elimina Dados Invalidos
+#'
+#' Identifica dados invalidos nas series temporais e elimina da amostra.
+#' A funcao avalia os valores das series temporais das variaveis contidas no data.table,
+#' identifica posicoes com valores 999 ou NA e elimina de todas as variaveis concomitantemente.
+#'
+#' @param dt 'data.table' contendo os dados com as series temporais
+#'
+#' @return 'data.table' contendo os dados com as series temporais apos eliminacao de dados invalidos
+#'
+elimina_dados_invalidos <- function(dt){
+    col_var <- setdiff(names(dt), "data_hora")
+    dt[, (col_var) := lapply(.SD, function(x) fifelse(x == 999, NA, x)), .SDcols = col_var]
+    dt_valido <- dt[complete.cases(dt[, .SD, .SDcols = col_var])]
+
+}
+
 #' Seleciona janela dos dados para treinamento
 #'
 #' @param dt `data.table` com data_hora, geracao, variaveis meteorologicas
@@ -321,6 +349,7 @@ seleciona_janela <- function(dt, data_ref, janela_dias_treinamento) {
 #' )
 #' dados_suficientes(dt, num_min_dados = 2)
 dados_suficientes <- function(dt, num_min_dados) {
+    dt <- copy(dt)
     col_var <- setdiff(names(dt), "data_hora")
 
     dt[, (col_var) := lapply(.SD, function(x) fifelse(x == 0, NA, x)), .SDcols = col_var]
@@ -441,21 +470,14 @@ calcula_erros <- function(dt, nlmod1, nlmod2) {
 #'
 #' @param dt data.table com variável \code{ger_obs_norm}, \code{irrad_prev_norm},
 #' \code{temp_prev_norm} e \code{umid_prev_norm}..
-#' @param nlmod1 Modelo 1
-#' @param nlmod2 Modelo 2
+#' @param nlmod1 Modelo RLS
+#' @param nlmod2 Modelo RLM
 #'
 #' @return Lista com erro médio de cada modelo.
 calcula_erros_fisico_estimado <- function(dt, nlmod1, nlmod2) {
     prev1 <- as.numeric(fitted(nlmod1))
     prev2 <- as.numeric(fitted(nlmod2))
 
-    # filtra valores de geracao nao-NA
-    # col_ger <- names(dt)[grep("ger_obs", names(dt))]
-    # y <- dt[[col_ger]]
-    # y_validos <- y[!is.na(y)]
-
-    # # filtra valores nao-NA coincidentes de geracao e variaveis exogenas
-    # var_exog <- setdiff(names(dt), col_ger)
     dt_valido <- dt[complete.cases(dt)]
 
     l_erros <- list(erro1 = mean(abs(dt_valido$ger_obs - prev1), na.rm = TRUE),
