@@ -6,6 +6,7 @@ library("forecast")
 source("R/parser.r")
 source("R/config-file.r")
 source("R/train.r")
+source("R/predict.r")
 source("R/utils.r")
 
 parser <- get_parser()
