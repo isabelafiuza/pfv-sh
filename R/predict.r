@@ -60,6 +60,7 @@ predict_usina <- function(
     # Filtra os dados de geracao e meteorologicos referentes a usina atual
     dad_usi <- dt_usinas[id_usina == iu]
     ger_usi <- dt_ger_obs[id_usina == iu]
+    dt_prev <- copy(dt_prev)
     prev_met_usi <- lapply(dt_prev, function(dt) dt[id_usina == iu])
 
     ger_usi[, hora_min := format(data_hora_observacao, "%H:%M")]
@@ -109,7 +110,7 @@ parse_predict.arimax <- function(
     setnames(dt_treino_filt, "valor", "ger_obs")
 
     # avalia numero de conjuntos ger x irr x temp x umid
-    if (dados_suficientes(dt_treino_filt, num_min_dados = 5) == TRUE) {
+    if (dados_suficientes(dt_treino_filt, num_min_dados = modelo_parametros$amos_min) == TRUE) {
         # normaliza as variaveis necessarias para o ajuste
         norm_resultado <- normaliza_variaveis(dt_treino_filt)
         dt_treino_norm <- norm_resultado$dados
@@ -152,6 +153,8 @@ parse_predict.arimax <- function(
         dt_prev_out <- desnormaliza_variaveis(dt_prev_out, stats_norm)
 
         prev_final <- dt_prev_out$ger_obs
+    } else {
+        
     }
 }
 

@@ -209,7 +209,7 @@ identifica_periodo_ger <- function(dad_usina, ger_usi, fator_tol_ger, fator_tol_
 
     # contar em quantos dias houve geracao acima do limiar para cada hora:minuto
     resumo <- dt[
-        valor > fator_tol_ger * dad_usi$capacidade_instalada_MW,
+        valor > fator_tol_ger * dad_usina$capacidade_instalada_MW,
         .(dias_com_geracao = uniqueN(data)),
         by = hora_min
     ]

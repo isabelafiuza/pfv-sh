@@ -77,8 +77,9 @@ valida_tipos_config <- function(config) {
 
 config_types <- function() {
     structure(
-        list("character", "character", "character", "character", list("character", "NULL"), 
-        "character", "character" , "character", list("character", "integer"), "numeric"),
+        list("character", "character", "character", "character", "character",
+        "character", "character" , "character", list("character", "numeric", "numeric"),
+        list("numeric", "numeric", "numeric")),
         names = config_names())
 }
 
@@ -86,27 +87,35 @@ config_types <- function() {
 #' 
 #' Funcao interna auxiliar de [`valida_tipos_config`]
 #' 
-#' Tanto `l` quanto `tipos` podem ser escalares ou listas. No caso de `l`, cada elemento sera checado
+#' Tanto `l` quanto `tipos` podem ser escalares, vetores ou listas. No caso de `l`, cada elemento sera checado
 #' individualmente. Se `tipos` for uma lista, `l` sera checado contra cada um dos tipos e retorna
-#' `TRUE` se ao menos um deles for valido
+#' `TRUE` se a correspondencia for valida
 #' 
 #' @param l valor de uma chave do arquivo de configuracao, escalar ou lista
 #' @param tipos tipos esperados de `l`, escalar ou lista
 #' 
 #' @return booleano indicando se validacao encerrou com sucesso ou nao
 
-valid_tipos <- function(l, tipos) do.call(all, list(sapply(l, valid_tipos_unit, tipos = tipos)))
+valid_tipos <- function(l, tipos) all(sapply(l, valid_tipos_unit, tipos = tipos))
 
 #' Auxiliar De `valid_tipos`
 #' 
 #' Funcao interna para isolar o loop ao longo de `l` em `valid_tipos`
 #' 
-#' @param x escalar ou lista, elemento de uma chave do arquivo de configuracao
-#' @param tipos tipos esperados de `x`, escalar ou lista
+#' @param x escalar, vetor ou lista, elemento de uma chave do arquivo de configuracao
+#' @param tipos tipos esperados de `x`, escalar, vetor ou lista
 #' 
 #' @return booleano indicando se validacao encerrou com sucesso ou nao
 
-valid_tipos_unit <- function(x, tipos) Reduce("|", mapply(inherits, x = x, tipos))
+valid_tipos_unit <- function(x, tipos) {
+    
+    tipos <- unlist(tipos)
+    if (!is.list(x)) {
+        return(any(inherits(x, tipos)))
+    }
+
+    Reduce("|", mapply(inherits, x = x, tipos))
+}
 
 # PARSERS ------------------------------------------------------------------------------------------
 

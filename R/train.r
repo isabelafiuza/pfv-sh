@@ -144,7 +144,7 @@ parse_train.arimax <- function(modelo_parametros, pars,
     nlmod0 <- ajusta_dummy(dt_treino_filt)
 
     # avalia numero de conjuntos ger x irr x temp x umid
-    if (dados_suficientes(dt_treino_filt, num_min_dados = 5) == TRUE) {
+    if (dados_suficientes(dt_treino_filt, num_min_dados = modelo_parametros$amos_min) == TRUE) {
         # normaliza as variaveis necessarias para o ajuste
         norm_resultado <- normaliza_variaveis(dt_treino_filt)
         dt_treino_norm <- norm_resultado$dados

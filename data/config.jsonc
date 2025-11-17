@@ -25,7 +25,7 @@
     //      Exemplo: para "data_referencia": "2025-07-02" e "horizonte_dias": ["D+0","D+1"], sera realizada a previsao 
     //      para o horizonte de "2025-07-02", "2025-07-03".
     //      * Para o modo de execucao ´train´, e tratado como o horizonte de dias a frente para treinamento do modelo.
-    "horizonte_dias": ["D+0"],
+    "horizonte_dias": ["D+0", "D+1"],
 
     // Lista contendo o nome dos modelos NWP a serem considerados no processo de previsao
     "modelos_NWP": ["GFS"],
@@ -38,11 +38,13 @@
     "modelos_previsao": {
         "arimax": {
             "tipo": "arimax",
-            "n_dias_treino": 360
+            "n_dias_treino": 360,
+            "amos_min": 5
         },
         "fisico_estimado": {
             "tipo": "fisico_estimado",
-            "n_dias_treino": 180
+            "n_dias_treino": 180,
+            "amos_min": 5
         }
     },
 
