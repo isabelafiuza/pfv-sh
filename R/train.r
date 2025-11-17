@@ -134,6 +134,7 @@ parse_train.fisico_estimado <- function(modelo_parametros, pars,
     # seleciona modelo
     selecao <- seleciona_modelo_fisico_estimado(nlmod1, nlmod2, erros)
 
+    return(selecao)
     # cria diferenciacao para alguns horarios dias para que o ajuste seja apenas ger x irr
 }
 
