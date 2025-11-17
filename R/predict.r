@@ -1,5 +1,3 @@
-mod_aju <- readRDS(paste(args$output, "BAUFI1_modelos_ajustados.rds", sep = "/"))
-
 predict_main <- function(args) {
     conn <- conectamock_pfv(args$input)
 
@@ -30,6 +28,30 @@ predict_main <- function(args) {
         parametros_periodo_geracao = args$parametros_periodo_geracao,
         data_prev = data_prev
     )
+
+    # monta data.table geracao_prevista
+    dt_final <- rbindlist(
+        lapply(seq_along(prev), function(i) {
+            id_usina <- v_usinas[i]
+            prev_usina <- prev[[i]]
+
+            rbindlist(
+                lapply(prev_usina, monta_dt_prev,
+                    id_usina = id_usina,
+                    data_referencia = args$data_referencia
+                )
+            )
+        })
+    )
+
+    # define ordem da previsao
+    setorder(
+        dt_prev_final,
+        id_usina,
+        id_modelo_prev,
+        id_modelo_nwp,
+        data_hora_previsao
+    )
 }
 
 predict_usina <- function(
@@ -45,12 +67,14 @@ predict_usina <- function(
         dt[, hora_min := format(data_hora_previsao, "%H:%M")]
     })
 
+    # leitura dos parametros ajustados
+    mod_aju <- readRDS(paste(args$output, "BAUFI1_modelos_ajustados.rds", sep = "/"))
 
     ger_prev <- lapply(seq_along(mod_aju), function(i) {
         pars <- mod_aju[[i]]$combinacao_ajuste
 
         modelo_despacho <- pars$modelo_prev
-        modelo_parametros <- param_modelo_previsao[[modelo_despacho]]
+        modelo_parametros <- parametros_modelo_previsao[[modelo_despacho]]
 
         prev <- parse_predict(
             mod_aju[[i]]$modelo, pars, data_prev,
@@ -70,6 +94,9 @@ parse_predict.arimax <- function(
     prev_met_usi, modelo_parametros) {
     dt_filt <- filtra_dado_por_combinacao(pars, prev_met_usi, ger_usi)
 
+    # FUNCAO QUE CHECA OS DADOS DEVE FAZER ISSO
+    dt_filt[, (names(dt_filt)) := lapply(.SD, function(x) fifelse(x == 999, NA, x))]
+
     # Separa os dados de geracao e meteorologicos em treino e previsao -
     # PODE TRANSFORMAR EM FUNCAO DEPOIS
     dt_treino_filt <- dt_filt[as.Date(data_hora) < data_prev[1]]
@@ -83,8 +110,6 @@ parse_predict.arimax <- function(
 
     # avalia numero de conjuntos ger x irr x temp x umid
     if (dados_suficientes(dt_treino_filt, num_min_dados = 5) == TRUE) {
-        # diferencia treinamento e previsao
-
         # normaliza as variaveis necessarias para o ajuste
         norm_resultado <- normaliza_variaveis(dt_treino_filt)
         dt_treino_norm <- norm_resultado$dados
@@ -96,15 +121,14 @@ parse_predict.arimax <- function(
         # normaliza dados previstos com base nas estatisticas de treino
         dt_prev_norm <- copy(dt_prev_filt)
         dt_prev_norm[, data_hora := NULL]
-        names(dt_prev_norm) <- cols_norm 
 
         for (i in seq_len(nrow(stats_norm))) {
             var <- stats_norm$variavel[i]
-            if (var %in% names(dt_prev_norm)) {
-                media <- stats_norm$med[i]
-                desvio <- stats_norm$sd[i]
-                dt_prev_norm[, paste0(var, "_norm") := (get(var) - media) / desvio]
-            }
+
+            media <- stats_norm$med[i]
+            desvio <- stats_norm$sd[i]
+            dt_prev_norm[, paste0(var, "_norm") := (get(var) - media) / desvio]
+            dt_prev_norm[, (var) := NULL]
         }
 
         var_exog <- setdiff(names(dt_prev_norm), "ger_obs_norm")

@@ -51,7 +51,7 @@ treina_usina <- function(
     periodo_ger <- identifica_periodo_ger(dad_usi, ger_usi, fator_tol_ger = parametros_periodo_geracao$fator_tolerancia_limite_inferior_geracao, fator_tol_horas = parametros_periodo_geracao$percentual_dias_geracao)
 
     # gera lista com as combinacoes nwp x passo de previsao x meia-hora x modelos de previsao
-    list_comb <- gera_combinacoes_modelo(v_modelos_nwp, v_horizonte, periodo_ger, v_modelos_previsao)
+    list_comb <- gera_combinacoes_modelo(v_modelos_nwp, v_horizonte, periodo_ger, v_modelos_previsao[1])
 
     # treina modelo
     mod_aju <- lapply(list_comb, train_modelo,
@@ -72,10 +72,12 @@ train_modelo <- function(l, ger_usi, prev_met_usi, param_modelo_previsao, data_f
         ger_usi = ger_usi,
         prev_met_usi = prev_met_usi,
         data_fim_treino = data_fim_treino) 
+    class(nlmod) <- modelo_despacho
     list(
         combinacao_ajuste = l,
         modelo = nlmod
     )
+    
 }
 
 parse_train <- function(modelo_parametros, ...) UseMethod("parse_train")
@@ -131,6 +133,9 @@ parse_train.arimax <- function(modelo_parametros, pars,
                                ger_usi, prev_met_usi, data_fim_treino) {
     dt_treino <- filtra_dado_por_combinacao(pars, prev_met_usi, ger_usi)
 
+    # FUNCAO QUE CHECA OS DADOS DEVE FAZER ISSO
+    dt_treino[, (names(dt_treino)) := lapply(.SD, function(x) fifelse(x == 999, NA, x))]
+
     # seleciona janela dos dados para treinamento
     dt_treino_filt <- seleciona_janela(dt_treino, data_fim_treino, janela_dias_treinamento = modelo_parametros$n_dias_treino)
     setnames(dt_treino_filt, "valor", "ger_obs")
@@ -159,6 +164,8 @@ parse_train.arimax <- function(modelo_parametros, pars,
 
         # seleciona do modelo com base no desvio e aicc
         selecao <- seleciona_modelo(nlmod1, nlmod2, erros)
+    } else {
+        return(nlmod0)
     }
     # cria diferenciacao para alguns horarios dias para que o ajuste
     # seja apenas ger x irr

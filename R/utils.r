@@ -339,3 +339,54 @@ filtra_dado_por_combinacao <- function(elem_comb, prev_met_usi, ger_usi) {
 
     return(dt_merged)
 }
+
+#' Monta data.table com previsoes elaboradas para uma usina
+#'
+#' @description
+#' Organiza previsao elaborada para uma usina em um data.table
+#' contendo informacoes do modelo de previsao, modelo nwp, data_hora_rodada
+#' e data_hora_previsao
+#'
+#' @param prev_usina_elem `list` contendo listas pelo menos com os elementos:
+#' \itemize {
+#'  \item combinacao_ajuste - conjunto de parametros que definem a previsao,
+#'  incluindo id_modelo_nwp, horiz_prev, hora_min, modelo_prev
+#'  \item prev - valor previsto
+#' }
+#'
+#' @param id_usina `character` com identificador da usina
+#'
+#' @param data_referencia `date` que identificada data da rodada
+#'
+#' @return `data.table` com os dados previstos para a usina
+
+monta_dt_prev <- function(prev_usina_elem, id_usina, data_referencia) {
+
+    data_hora_rodada <- as.POSIXct(data_referencia, tz = "UTC")
+
+    # dados da combinação
+    id_modelo_prev  <- prev_usina_elem$combinacao_ajuste$modelo_prev
+    id_modelo_nwp   <- prev_usina_elem$combinacao_ajuste$id_modelo_nwp
+    horiz_prev      <- prev_usina_elem$combinacao_ajuste$horiz_prev   
+    hora_min        <- prev_usina_elem$combinacao_ajuste$hora_min     
+
+    # define data_hora_previsao
+    dias <- as.integer(sub("D\\+", "", horiz_prev))
+
+    hora_prev <- hm(hora_min)
+    data_hora_previsao <- data_hora_rodada + days(dias) + hora_prev
+
+    # extrai valor da previsao
+    valor <- as.numeric(prev_usina_elem$prev)
+
+    data.table(
+        id_modelo_prev = id_modelo_prev,
+        id_usina = id_usina,
+        id_modelo_nwp = id_modelo_nwp,
+        data_hora_rodada = data_hora_rodada,
+        data_hora_previsao = data_hora_previsao,
+        valor = valor
+    )
+}
+
+
