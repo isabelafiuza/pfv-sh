@@ -1,3 +1,4 @@
+
 predict_main <- function(args) {
     conn <- conectamock_pfv(args$input)
 
@@ -14,11 +15,6 @@ predict_main <- function(args) {
 
     data_set_ger <- data_set$ger_obs
     data_set_met <- data_set[names(data_set) != "ger_obs"]
-
-    data_set_met <- lapply(data_set_met, associa_nwp_usina, dt_usinas)
-
-    data_set_met <- lapply(data_set_met, interpola_previsao_nwp)
-    data_set_met <- lapply(data_set_met, adicionar_passo_previsao)
 
     prev <- lapply(v_usinas, predict_usina,
         dt_usinas = dt_usinas,
@@ -60,8 +56,14 @@ predict_usina <- function(
     # Filtra os dados de geracao e meteorologicos referentes a usina atual
     dad_usi <- dt_usinas[id_usina == iu]
     ger_usi <- dt_ger_obs[id_usina == iu]
+
+    dt_prev <- lapply(dt_prev, function(dt) dt[id_modelo_nwp %in% v_modelos_nwp])
+    dt_prev <- lapply(dt_prev, associa_nwp_usina, dt_usinas = dt_usinas)
+    dt_prev <- lapply(dt_prev, interpola_previsao_nwp)
+    dt_prev <- lapply(dt_prev, preenche_ausencia_previsao)
+    dt_prev <- lapply(dt_prev, adicionar_passo_previsao)
     dt_prev <- copy(dt_prev)
-    prev_met_usi <- lapply(dt_prev, function(dt) dt[id_usina == iu])
+    dt_prev <- lapply(dt_prev, function(dt) dt[id_usina == iu])
 
     ger_usi[, hora_min := format(data_hora_observacao, "%H:%M")]
     prev_met_usi <- lapply(dt_prev, function(dt) {
@@ -156,6 +158,34 @@ parse_predict.arimax <- function(
     } else {
         
     }
+}
+
+parse_predict.fisico_estimado <- function(modelo_parametros, mod_aju_comb, pars){
+    dt_filt <- filtra_dado_por_combinacao(pars, prev_met_usi, ger_usi)
+
+    # separa as variaveis meteorologicas previstas para aplicacao no modelo
+    pos_hor <- which(v_horizonte == pars$horiz_prev)
+    dt_prev_filt <- dt_filt[as.Date(data_hora) == data_prev[pos_hor]]
+    setnames(dt_prev_filt, "valor", "ger_obs")
+
+    # obtem modelo
+    nlmod <- mod_aju_comb$modelo_final
+    variaveis_usadas <- mod_aju_comb$variaveis_usadas
+    cols <- names(dt_prev_filt)[names(dt_prev_filt) %in% variaveis_usadas]
+    variaveis_previstas <- dt_prev_filt[, .SD, .SDcols = cols]
+
+    # gera previsao
+    dt_prev <- predict(nlmod, variaveis_previstas, interval = "prediction")
+    dt_prev_out <- dt_prev$fit
+
+    return(dt_prev_out)    
+}
+
+# AUXILIARES ---------------------------------------------------------------------------------------
+
+carrega_modelo_RDS <- function(modelo_previsao, id_usina, diretorio){
+    mod_aju <- readRDS(paste(diretorio, paste0(id_usina, "_", modelo_previsao, "_ajustado.rds"), sep = "/"))
+    return(mod_aju)
 }
 
 #' Recalibra modelo ARIMA simples
