@@ -156,7 +156,7 @@ parse_predict.arimax <- function(
 
         prev_final <- dt_prev_out$ger_obs
     } else {
-        
+        prev_final <- NA_real_
     }
 }
 

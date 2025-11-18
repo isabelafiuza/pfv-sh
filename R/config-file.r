@@ -77,8 +77,8 @@ valida_tipos_config <- function(config) {
 
 config_types <- function() {
     structure(
-        list("character", "character", "character", "character", "character",
-        "character", "character" , "character", list("character", "numeric", "numeric"),
+        list("character", "character", "character", "character", list("character", "NULL"),
+        "character", list("character", "NULL") , "character", list("character", "numeric", "numeric"),
         list("numeric", "numeric", "numeric")),
         names = config_names())
 }
