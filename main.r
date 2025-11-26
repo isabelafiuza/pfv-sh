@@ -17,3 +17,16 @@ conn <- conectamock_pfv(args$datadir)
 config <- get_config(conn)
 config <- parse_config(config, conn)
 
+tryCatch(
+    {
+        if(config$mode == "predict"){
+            predict_main(config)
+        }else{
+            train_main(config)
+        }
+    },
+    error = function(e) {
+        msg <- "Erro"
+        print(msg)
+    }
+)
