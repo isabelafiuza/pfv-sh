@@ -252,17 +252,6 @@ Inclua:
 
 ---
 
-## 8. Código de Conduta
-
-Seja respeitoso e construtivo. Contribuidores devem:
-
-- Usar linguagem inclusiva
-- Aceitar críticas construtivas
-- Focar no que é melhor para o projeto
-- Mostrar empatia com outros contribuidores
-
----
-
 ## 9. Contato
 
 - **Maintainer**: Isabela Fiuza (isabela.fiuza@ons.org.br)

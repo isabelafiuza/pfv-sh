@@ -10,7 +10,8 @@
 ^saida$
 ^Dockerfile$
 ^\.dockerignore$
-^DOC-DIRECTIVES\.md$
-^NT_PFV\.pdf$
+^ARCHITECTURE.md$
+^CHANGELOG.md$
+^CONTRIBUTING.md$
 ^auxiliar$
 ^out$
