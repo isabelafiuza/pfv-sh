@@ -2,18 +2,19 @@
 % Please edit documentation in R/config-file.r
 \name{valid_tipos_unit}
 \alias{valid_tipos_unit}
-\title{Auxiliar De \code{valid_tipos}}
+\title{Valida Tipo de Um Elemento}
 \usage{
 valid_tipos_unit(x, tipos)
 }
 \arguments{
-\item{x}{escalar, vetor ou lista, elemento de uma chave do arquivo de configuracao}
+\item{x}{Elemento a validar}
 
-\item{tipos}{tipos esperados de \code{x}, escalar, vetor ou lista}
+\item{tipos}{Tipos esperados}
 }
 \value{
-booleano indicando se validacao encerrou com sucesso ou nao
+Logico indicando se tipo e valido
 }
 \description{
-Funcao interna para isolar o loop ao longo de \code{l} em \code{valid_tipos}
+Funcao auxiliar para validacao unitaria de tipo.
 }
+\keyword{internal}

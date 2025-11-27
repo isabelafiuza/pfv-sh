@@ -2,16 +2,17 @@
 % Please edit documentation in R/parser.r
 \name{inner_parser_generic_args}
 \alias{inner_parser_generic_args}
-\title{Auxiliar para adicionar argumentos genericos}
+\title{Adiciona Argumentos Genericos ao Parser}
 \usage{
 inner_parser_generic_args(parser)
 }
 \arguments{
-\item{parser}{objeto ArgumentParser para adicionar argumentos}
+\item{parser}{Objeto ArgumentParser}
 }
 \value{
-parser com argumentos adicionados
+Parser com argumentos adicionados
 }
 \description{
-Funcao interna, nao deve ser chamada diretamente pelo usuario
+Funcao interna que configura os argumentos padrao do CLI.
 }
+\keyword{internal}

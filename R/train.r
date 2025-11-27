@@ -1,3 +1,40 @@
+#' Executa Pipeline de Treinamento
+#'
+#' Ponto de entrada principal para o treinamento de modelos de previsao de geracao
+#' solar fotovoltaica. Processa todas as usinas especificadas na configuracao.
+#'
+#' @param args Lista de argumentos de configuracao contendo:
+#'   \describe{
+#'     \item{input}{Caminho para diretorio de dados de entrada}
+#'     \item{output}{Caminho para diretorio de saida dos artefatos}
+#'     \item{ids_usinas}{Vetor de IDs das usinas a processar}
+#'     \item{data_referencia}{Data de referencia para treinamento}
+#'     \item{horizonte_dias}{Vetor de horizontes (e.g., c("D+0", "D+1"))}
+#'     \item{modelos_NWP}{Vetor de modelos NWP a utilizar}
+#'     \item{modelos_previsao}{Lista de configuracoes dos modelos de previsao}
+#'     \item{parametros_periodo_geracao}{Parametros para identificacao de periodo solar}
+#'   }
+#'
+#' @return Lista de artefatos de modelos treinados (invisivel). Os modelos tambem
+#'   sao salvos em arquivos RDS no diretorio de saida.
+#'
+#' @details
+#' O pipeline de treinamento executa os seguintes passos para cada usina:
+#' \enumerate{
+#'   \item Carrega dados de geracao observada e previsoes meteorologicas
+#'   \item Associa previsoes NWP as coordenadas da usina
+#'   \item Interpola dados para resolucao semi-horaria
+#'   \item Identifica periodos com geracao solar
+#'   \item Gera combinacoes (NWP × horizonte × meia-hora × modelo)
+#'   \item Treina modelo para cada combinacao
+#'   \item Salva artefatos em \code{{output}/{id_usina}_modelos_ajustados.rds}
+#' }
+#'
+#' @seealso
+#' \code{\link{treina_usina}} para treinamento de uma usina especifica
+#' \code{\link{parse_train}} para dispatch de treinamento por tipo de modelo
+#'
+#' @export
 train_main <- function(args) {
     conn <- conectamock_pfv(args$input)
 
@@ -27,6 +64,35 @@ train_main <- function(args) {
     )
 }
 
+#' Treina Modelos para Uma Usina
+#'
+#' Executa o pipeline completo de treinamento para uma usina especifica,
+#' gerando modelos para todas as combinacoes de NWP, horizonte e meia-hora.
+#'
+#' @param iu Identificador da usina (character)
+#' @param dt_usinas data.table com cadastro de usinas
+#' @param dt_ger_obs data.table com geracao observada
+#' @param dt_prev Lista de data.tables com previsoes meteorologicas
+#' @param v_modelos_nwp Vetor de modelos NWP a utilizar
+#' @param v_horizonte Vetor de horizontes de previsao
+#' @param v_modelos_previsao Vetor de tipos de modelos de previsao
+#' @param parametros_modelo_previsao Lista com parametros de cada modelo
+#' @param parametros_periodo_geracao Lista com parametros de identificacao do periodo solar
+#' @param data_fim_treino Data limite para dados de treinamento
+#'
+#' @return Salva artefatos RDS no diretorio de saida (efeito colateral)
+#'
+#' @details
+#' Esta funcao realiza:
+#' \enumerate{
+#'   \item Filtragem de dados por usina
+#'   \item Pre-processamento de dados NWP (associacao, interpolacao, preenchimento)
+#'   \item Identificacao de meias-horas com geracao solar
+#'   \item Geracao de todas as combinacoes para treinamento
+#'   \item Treinamento paralelo de modelos via \code{lapply}
+#' }
+#'
+#' @keywords internal
 treina_usina <- function(
     iu, dt_usinas, dt_ger_obs, dt_prev, v_modelos_nwp,
     v_horizonte, v_modelos_previsao, parametros_modelo_previsao,
@@ -71,6 +137,30 @@ treina_usina <- function(
     saveRDS(mod_aju, file = paste(args$output, paste0(iu, "_modelos_ajustados.rds"), sep = "/"))
 }
 
+#' Treina Modelo Individual
+#'
+#' Treina um modelo de previsao para uma combinacao especifica de
+#' NWP, horizonte, meia-hora e tipo de modelo.
+#'
+#' @param l Lista contendo a combinacao de parametros:
+#'   \describe{
+#'     \item{id_modelo_nwp}{Identificador do modelo NWP}
+#'     \item{horiz_prev}{Horizonte de previsao (e.g., "D+0")}
+#'     \item{hora_min}{Meia-hora no formato "HH:MM"}
+#'     \item{modelo_prev}{Tipo de modelo de previsao}
+#'   }
+#' @param ger_usi data.table com geracao observada da usina
+#' @param prev_met_usi Lista de data.tables com previsoes meteorologicas
+#' @param param_modelo_previsao Lista com parametros dos modelos
+#' @param data_fim_treino Data limite para dados de treinamento
+#'
+#' @return Lista contendo:
+#'   \describe{
+#'     \item{combinacao_ajuste}{Parametros da combinacao}
+#'     \item{modelo}{Objeto do modelo ajustado}
+#'   }
+#'
+#' @keywords internal
 train_modelo <- function(l, ger_usi, prev_met_usi, param_modelo_previsao, data_fim_treino) {
     modelo_despacho <- l$modelo_prev
     modelo_parametros <- param_modelo_previsao[[modelo_despacho]]
@@ -87,21 +177,77 @@ train_modelo <- function(l, ger_usi, prev_met_usi, param_modelo_previsao, data_f
     )
 }
 
+#' Metodo Generico para Treinamento de Modelo
+#'
+#' Funcao generica S3 que despacha para o metodo especifico de treinamento
+#' baseado no tipo de modelo especificado.
+#'
+#' @param modelo_parametros Lista com parametros do modelo, incluindo classe S3
+#' @param ... Argumentos adicionais passados aos metodos especificos
+#'
+#' @return Objeto do modelo treinado (tipo depende do metodo especifico)
+#'
+#' @seealso
+#' \code{\link{parse_train.arimax}} para treinamento ARIMAX
+#' \code{\link{parse_train.fisico_estimado}} para treinamento Fisico-Estimado
+#'
+#' @export
 parse_train <- function(modelo_parametros, ...) UseMethod("parse_train")
 
+#' Metodo Default para parse_train
+#'
+#' Metodo default que gera erro para tipos de modelo nao suportados.
+#'
+#' @param modelo_parametros Lista com parametros do modelo
+#' @param ... Argumentos adicionais (ignorados)
+#'
+#' @return Gera erro indicando tipo de modelo desconhecido
+#'
 #' @export
 parse_train.default <- function(modelo_parametros, ...) {
     stop("Unknown model type for parse_train")
 }
 
-#' Treinamento Usando O Metodo Fisico Estimado
+#' Treinamento de Modelo Fisico-Estimado
 #'
-#' Realiza treinamento do modelo fisico estimado e salva modelo para uso futuro
+#' Treina um modelo fisico-estimado baseado em regressao linear para previsao
+#' de geracao solar. Compara regressao linear simples (RLS) vs multipla (RLM).
 #'
-#' @param modelo_parametros lista com parametros do modelo
-#' @param ... argumentos adicionais incluindo pars, ger_usi, prev_met_usi, data_fim_treino
+#' @param modelo_parametros Lista com parametros do modelo:
+#'   \describe{
+#'     \item{n_dias_treino}{Numero de dias para janela de treinamento}
+#'     \item{amos_min}{Numero minimo de amostras validas requeridas}
+#'   }
+#' @param ... Argumentos adicionais:
+#'   \describe{
+#'     \item{pars}{Lista com combinacao de parametros (NWP, horizonte, meia-hora)}
+#'     \item{ger_usi}{data.table com geracao observada}
+#'     \item{prev_met_usi}{Lista de data.tables com previsoes meteorologicas}
+#'     \item{data_fim_treino}{Data limite para dados de treinamento}
+#'   }
 #'
-#' @return modelos ajustados
+#' @return Lista contendo:
+#'   \describe{
+#'     \item{modelo_escolhido}{"RLS" ou "RLM"}
+#'     \item{modelo_final}{Objeto lm ajustado}
+#'     \item{variaveis_usadas}{Nomes das variaveis utilizadas no modelo}
+#'   }
+#'
+#' @details
+#' O metodo executa:
+#' \enumerate{
+#'   \item Filtra dados pela combinacao NWP × horizonte × meia-hora
+#'   \item Elimina dados invalidos (NA, 999)
+#'   \item Ajusta modelo RLS: geracao ~ irradiancia
+#'   \item Ajusta modelo RLM: geracao ~ irradiancia + outras variaveis
+#'   \item Seleciona melhor modelo por erro medio absoluto
+#' }
+#'
+#' Se coeficientes forem negativos ou dados insuficientes, a janela de
+
+#' treinamento e automaticamente expandida (ate +200 dias).
+#'
+#' @seealso \code{\link{aplica_regressao_linear}}
 #'
 #' @export
 parse_train.fisico_estimado <- function(modelo_parametros, ...) {
@@ -171,15 +317,26 @@ parse_train.fisico_estimado <- function(modelo_parametros, ...) {
 
 #' Aplica Regressao Linear
 #'
-#' Funcao que aplica regressao linear a um conjunto de dados
+#' Ajusta um modelo de regressao linear a um conjunto de dados,
+#' com fallback para modelo dummy em caso de erro.
 #'
-#' @param dt_y ´data.table´ contendo a variavel resposta. Exemplo: geracao observada
-#' @param dt_x ´data.table´ contendo a(s) variavel(is) explicativas. Exemplo: irradiancia, umidade e temperatura
-#' As observacoes contidas nos data.tables contendo as variaveis ja devem estar em posicoes compativeis
-#' @param nlmod0 modelo de fallback em caso de erro no ajuste
+#' @param dt_y data.table contendo a variavel resposta (e.g., geracao observada)
+#' @param dt_x data.table contendo a(s) variavel(is) explicativa(s)
+#'   (e.g., irradiancia, umidade, temperatura). As observacoes devem estar
+#'   alinhadas com \code{dt_y}.
+#' @param nlmod0 Modelo de fallback retornado em caso de erro no ajuste.
+#'   Se \code{NULL}, erro e propagado.
 #'
-#' @return modelos ajustados
+#' @return Objeto \code{lm} com o modelo ajustado
 #'
+#' @examples
+#' \dontrun{
+#' dt_y <- data.table(ger_obs = c(10, 20, 30))
+#' dt_x <- data.table(irrad = c(100, 200, 300))
+#' modelo <- aplica_regressao_linear(dt_y, dt_x)
+#' }
+#'
+#' @keywords internal
 aplica_regressao_linear <- function(dt_y, dt_x, nlmod0) {
     dados <- cbind(dt_y, dt_x)
     resposta <- names(dt_y)
@@ -195,12 +352,45 @@ aplica_regressao_linear <- function(dt_y, dt_x, nlmod0) {
     return(modelo)
 }
 
-#' Treinamento Usando O Metodo ARIMAX
+#' Treinamento de Modelo ARIMAX
 #'
-#' @param modelo_parametros lista com parametros do modelo
-#' @param ... argumentos adicionais incluindo pars, ger_usi, prev_met_usi, data_fim_treino
+#' Treina um modelo ARIMA com variaveis exogenas (ARIMAX) para previsao
+#' de geracao solar. Utiliza selecao automatica de ordem via \code{auto.arima}.
 #'
-#' @return modelos ajustados
+#' @param modelo_parametros Lista com parametros do modelo:
+#'   \describe{
+#'     \item{n_dias_treino}{Numero de dias para janela de treinamento}
+#'     \item{amos_min}{Numero minimo de amostras validas requeridas}
+#'   }
+#' @param ... Argumentos adicionais:
+#'   \describe{
+#'     \item{pars}{Lista com combinacao de parametros (NWP, horizonte, meia-hora)}
+#'     \item{ger_usi}{data.table com geracao observada}
+#'     \item{prev_met_usi}{Lista de data.tables com previsoes meteorologicas}
+#'     \item{data_fim_treino}{Data limite para dados de treinamento}
+#'   }
+#'
+#' @return Lista contendo:
+#'   \describe{
+#'     \item{modelo_escolhido}{"ARIMA" ou "ARIMAX"}
+#'     \item{modelo_final}{Objeto Arima ajustado}
+#'   }
+#'   Se dados insuficientes, retorna modelo dummy (Arima).
+#'
+#' @details
+#' O metodo executa:
+#' \enumerate{
+#'   \item Filtra dados pela combinacao NWP × horizonte × meia-hora
+#'   \item Substitui valores 999 por NA
+#'   \item Normaliza variaveis (z-score)
+#'   \item Ajusta modelo ARIMA puro via \code{auto.arima}
+#'   \item Ajusta modelo ARIMAX com irradiancia como variavel exogena
+#'   \item Seleciona melhor modelo por AICc + erro medio absoluto
+#' }
+#'
+#' @seealso
+#' \code{\link[forecast]{auto.arima}}
+#' \code{\link{ajusta_arima}}, \code{\link{ajusta_arimax}}
 #'
 #' @export
 parse_train.arimax <- function(modelo_parametros, ...) {
@@ -256,15 +446,25 @@ parse_train.arimax <- function(modelo_parametros, ...) {
 
 # AUXILIARES ---------------------------------------------------------------------------------------
 
-#' Cria Dataset Dos Dados Para Treino dos Modelos
+#' Cria Dataset para Treinamento
 #'
-#' Cria dataset dos dados usados no treinamento dos modelos de previsao de acordo configuracao especificada
+#' Carrega e organiza os dados necessarios para treinamento dos modelos,
+#' incluindo geracao observada e previsoes meteorologicas.
 #'
-#' @param args Lista de argumentos necessarios para criacao dos datasets
-#' @param conn Objeto de conexao com banco de dados
+#' @param args Lista de argumentos contendo:
+#'   \describe{
+#'     \item{ids_usinas}{Vetor de IDs das usinas}
+#'     \item{modelos_NWP}{Vetor de modelos NWP a carregar}
+#'   }
+#' @param conn Objeto de conexao com banco de dados (via pfvIO)
 #'
-#' @return lista contendo o dataset
+#' @return Lista nomeada contendo:
+#'   \describe{
+#'     \item{ger_obs}{data.table com geracao observada}
+#'     \item{irrad_prev}{data.table com irradiancia prevista}
+#'   }
 #'
+#' @keywords internal
 get_dataset <- function(args, conn) {
     ger_obs <- get_geracao_observada(conn, id_usina = args$ids_usinas)
     irrad_prev <- get_irradiancia_prevista(conn, id_usina = args$ids_usinas, id_modelo_nwp = args$modelos_NWP)
@@ -275,17 +475,32 @@ get_dataset <- function(args, conn) {
     return(out)
 }
 
-#' Preenche Lacunas de Previsao
+#' Preenche Lacunas de Rodadas NWP
 #'
-#' Identifica dias em que nao ha rodada do modelo meteorologico na base de dados e preenche as previsoes
-#' referentes a essa execucao ausente com NA.
-#' A funcao avalia a coluna 'data_hora_rodada' de cada modelo meteorologico e, sendo verificada a
-#' ausencia de alguma data, inclui dados NA para compatibilizacao das series temporais.
+#' Identifica datas em que nao ha rodada do modelo NWP e preenche
+#' as previsoes ausentes com NA para manter series temporais completas.
 #'
-#' @param dt 'data.table' contendo as previsoes meteorologicas
+#' @param dt data.table contendo previsoes meteorologicas com colunas:
+#'   \describe{
+#'     \item{id_modelo_nwp}{Identificador do modelo NWP}
+#'     \item{id_usina}{Identificador da usina}
+#'     \item{data_hora_rodada}{Data/hora da rodada do modelo}
+#'     \item{data_hora_previsao}{Data/hora da previsao}
+#'     \item{valor}{Valor previsto}
+#'   }
 #'
-#' @return 'data.table' contendo as previsoes com datas de execucao do modelo meteorologico completas
+#' @return data.table com datas de rodada completas (lacunas preenchidas com NA)
 #'
+#' @details
+#' A funcao:
+#' \enumerate{
+#'   \item Identifica sequencia completa de datas entre min e max data_hora_rodada
+#'   \item Detecta datas ausentes por modelo NWP e usina
+#'   \item Gera registros com valor NA para datas faltantes
+#'   \item Mantem estrutura temporal semi-horaria
+#' }
+#'
+#' @keywords internal
 preenche_ausencia_previsao <- function(dt) {
     datas_execucao <- dt[, .(data_hora_rodada = unique(data_hora_rodada)), by = .(id_modelo_nwp, id_usina)]
     datas_completas <- dt[,
@@ -318,18 +533,24 @@ preenche_ausencia_previsao <- function(dt) {
     return(dt_prev_completo)
 }
 
-#' Cria Data.table Auxiliar
+#' Cria data.table Auxiliar para Datas Ausentes
 #'
-#' Auxiliar da funcao ´preenche_ausencia_previsao´. Cria um ´data.table´ auxiliar
-#' com as datas ausentes nos dados originais de previsao meteorologica. As previsoes meteorologicas
-#' para essas datas sao preenchidas com ´NA´.
+#' Funcao auxiliar de \code{preenche_ausencia_previsao} que gera um data.table
+#' com previsoes NA para uma data de rodada ausente.
 #'
-#' @param dif  ´data.table´ contendo a data ausente nos dados de previsao numerica para a qual se deseja
-#' criar o data.table de previsoes NA. Contem tambem as demais informacoes necessaria para criar o
-#' @param dt_completo ´data.table´ completo com as previsoes meteorologicas para referencia
+#' @param dif data.table com uma linha contendo:
+#'   \describe{
+#'     \item{id_modelo_nwp}{Modelo NWP}
+#'     \item{id_usina}{Usina}
+#'     \item{data_hora_rodada}{Data da rodada ausente}
+#'     \item{passos_inicio}{Offset inicial das previsoes}
+#'     \item{passos_fim}{Offset final das previsoes}
+#'   }
+#' @param dt_completo data.table de referencia para obter latitude/longitude
 #'
-#' @return ´data.table´ nor formato adequado para inclusao nos dados de previsao meteorologica a ser usado
+#' @return data.table com estrutura identica as previsoes, valores = NA
 #'
+#' @keywords internal
 cria_dt_auxiliar <- function(dif, dt_completo) {
     latitude <- unique(dt_completo[id_modelo_nwp == dif$id_modelo_nwp & id_usina == dif$id_usina, latitude])
     longitude <- unique(dt_completo[id_modelo_nwp == dif$id_modelo_nwp & id_usina == dif$id_usina, longitude])
@@ -350,29 +571,41 @@ cria_dt_auxiliar <- function(dif, dt_completo) {
 
 #' Elimina Dados Invalidos
 #'
-#' Identifica dados invalidos nas series temporais e elimina da amostra.
-#' A funcao avalia os valores das series temporais das variaveis contidas no data.table,
-#' identifica posicoes com valores 999 ou NA e elimina de todas as variaveis concomitantemente.
+#' Remove registros com valores invalidos (999 ou NA) das series temporais.
+#' Valores 999 sao primeiro convertidos para NA, depois registros incompletos
+#' sao removidos.
 #'
-#' @param dt 'data.table' contendo os dados com as series temporais
+#' @param dt data.table com series temporais (deve conter coluna \code{data_hora})
 #'
-#' @return 'data.table' contendo os dados com as series temporais apos eliminacao de dados invalidos
+#' @return data.table filtrado apenas com registros completos
 #'
+#' @details
+#' O valor 999 e tratado como codigo de dado faltante em alguns sistemas
+#' meteorologicos. A funcao converte esses valores para NA antes de filtrar.
+#'
+#' @keywords internal
 elimina_dados_invalidos <- function(dt) {
     col_var <- setdiff(names(dt), "data_hora")
     dt[, (col_var) := lapply(.SD, function(x) fifelse(x == 999, NA, x)), .SDcols = col_var]
     dt_valido <- dt[complete.cases(dt[, .SD, .SDcols = col_var])]
 }
 
-#' Seleciona janela dos dados para treinamento
+#' Seleciona Janela Temporal de Treinamento
 #'
-#' @param dt `data.table` com data_hora, geracao, variaveis meteorologicas
-#' @param data_ref data de referencia para selecao da janela
-#' @param janela_dias_treinamento numero de dias utilizados
-#' para treinamento
+#' Filtra dados para incluir apenas as N ultimas datas antes da data de referencia.
 #'
-#' @return subset do data.table filtrado
-
+#' @param dt data.table com coluna \code{data_hora}
+#' @param data_ref Data de referencia (limite superior exclusivo)
+#' @param janela_dias_treinamento Numero de dias a incluir na janela
+#'
+#' @return data.table filtrado com dados da janela especificada
+#'
+#' @details
+#' Seleciona as \code{janela_dias_treinamento} datas mais recentes
+#' anteriores a \code{data_ref}. Util para definir conjunto de treinamento
+#' em validacao temporal.
+#'
+#' @keywords internal
 seleciona_janela <- function(dt, data_ref, janela_dias_treinamento) {
     dt <- copy(dt)
     dt[, data := as.Date(data_hora)]
@@ -388,23 +621,28 @@ seleciona_janela <- function(dt, data_ref, janela_dias_treinamento) {
     return(dt)
 }
 
-#' Verifica se ha dados suficientes para o ajuste
+#' Verifica Disponibilidade Minima de Dados
 #'
-#' @param dt `data.table` com data_hora, geracao, irradiancia,
-#' temperatura e umidade
-#' @param num_min_dados numero minimo de registros validos simultaneos
+#' Avalia se ha registros validos suficientes para ajuste do modelo.
+#' Considera como invalidos: valores NA e valores zero.
 #'
-#' @return TRUE se houver dados validos, FALSE caso contrario
+#' @param dt data.table com variaveis de interesse
+#' @param num_min_dados Numero minimo de registros validos requeridos
+#'
+#' @return Logico: \code{TRUE} se dados suficientes, \code{FALSE} caso contrario
 #'
 #' @examples
 #' \dontrun{
-#' dt <- data.table::data.table(
+#' dt <- data.table(
 #'     data_hora = 1:5,
 #'     ger = c(10, NA, 12, 0, 15),
 #'     irr = c(200, 210, NA, 205, 215)
 #' )
-#' dados_suficientes(dt, num_min_dados = 2)
+#' dados_suficientes(dt, num_min_dados = 2)  # TRUE
+#' dados_suficientes(dt, num_min_dados = 5)  # FALSE
 #' }
+#'
+#' @keywords internal
 dados_suficientes <- function(dt, num_min_dados) {
     dt <- copy(dt)
     col_var <- setdiff(names(dt), "data_hora")
@@ -418,27 +656,43 @@ dados_suficientes <- function(dt, num_min_dados) {
     TRUE
 }
 
-#' Cria um modelo ARIMA dummy
+#' Cria Modelo ARIMA Dummy
 #'
-#' @param dt  `data.table` com data_hora, geracao, irradiancia,
-#' temperatura e umidade do periodo de treinamento selecionado
-#' @return modelo ARIMA neutro
-
+#' Cria um modelo ARIMA "neutro" para uso como fallback quando dados sao
+#' insuficientes ou ajuste falha. O modelo retorna previsoes zero.
+#'
+#' @param dt data.table com dados de treinamento (usado apenas para dimensionamento)
+#'
+#' @return Objeto Arima ajustado a serie constante zero
+#'
+#' @keywords internal
 ajusta_dummy <- function(dt) {
     auto.arima(rep(0, nrow(dt)), allowdrift = FALSE, allowmean = FALSE)
 }
 
-#' Normaliza variaveis de entrada
+#' Normaliza Variaveis (Z-Score)
 #'
-#' @param dt `data.table` com data_hora, geracao, irradiancia,
-#' temperatura e umidade do periodo de treinamento selecionado
+#' Aplica normalizacao z-score a todas as variaveis numericas,
+#' exceto \code{data_hora}.
 #'
-#' @return lista com:
-#' \itemize{
-#'  \item \code{dados} - data.table com variaveis normalizadas
-#'  \item \code{stats} - medias e desvios padroes de cada variavel
-#' }
-
+#' @param dt data.table com variaveis a normalizar
+#'
+#' @return Lista contendo:
+#'   \describe{
+#'     \item{dados}{data.table com colunas normalizadas (sufixo \code{_norm})}
+#'     \item{stats}{data.table com estatisticas: variavel, med, sd}
+#'   }
+#'
+#' @details
+#' A normalizacao z-score transforma cada variavel X em:
+#' \deqn{X_{norm} = (X - \bar{X}) / \sigma_X}
+#'
+#' As estatisticas sao preservadas para posterior desnormalizacao
+#' das previsoes.
+#'
+#' @seealso \code{\link{desnormaliza_variaveis}}
+#'
+#' @keywords internal
 normaliza_variaveis <- function(dt) {
     col_excluida <- "data_hora"
 
@@ -499,12 +753,12 @@ ajusta_arimax <- function(dt, nlmod0) {
 
 #' Calcula erros medios in-sample dos modelos
 #'
-#' @param dt data.table com variável \code{ger_obs_norm}, \code{irrad_prev_norm},
+#' @param dt data.table com variavel \code{ger_obs_norm}, \code{irrad_prev_norm},
 #' \code{temp_prev_norm} e \code{umid_prev_norm}..
 #' @param nlmod1 Modelo ARIMA.
 #' @param nlmod2 Modelo ARIMAX.
 #'
-#' @return Lista com erro médio de cada modelo.
+#' @return Lista com erro medio de cada modelo.
 calcula_erros <- function(dt, nlmod1, nlmod2) {
     prev1 <- as.numeric(fitted(nlmod1))
     prev2 <- as.numeric(fitted(nlmod2))
@@ -525,12 +779,12 @@ calcula_erros <- function(dt, nlmod1, nlmod2) {
 
 #' Calcula erros medios in-sample dos modelos
 #'
-#' @param dt data.table com variável \code{ger_obs_norm}, \code{irrad_prev_norm},
+#' @param dt data.table com variavel \code{ger_obs_norm}, \code{irrad_prev_norm},
 #' \code{temp_prev_norm} e \code{umid_prev_norm}..
 #' @param nlmod1 Modelo RLS
 #' @param nlmod2 Modelo RLM
 #'
-#' @return Lista com erro médio de cada modelo.
+#' @return Lista com erro medio de cada modelo.
 calcula_erros_fisico_estimado <- function(dt, nlmod1, nlmod2) {
     prev1 <- as.numeric(fitted(nlmod1))
     prev2 <- as.numeric(fitted(nlmod2))

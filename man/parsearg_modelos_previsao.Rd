@@ -2,16 +2,18 @@
 % Please edit documentation in R/config-file.r
 \name{parsearg_modelos_previsao}
 \alias{parsearg_modelos_previsao}
-\title{Interpretador De Chave \code{modelos_previsao}}
+\title{Parser de modelos_previsao}
 \usage{
 parsearg_modelos_previsao(x)
 }
 \arguments{
-\item{x}{valor da chave \code{modelos_previsao}; lista com parametros do modelo}
+\item{x}{Lista com parametros do modelo, incluindo campo "tipo"}
 }
 \value{
-lista com classe definida pelo tipo do modelo
+Lista com classe S3 igual ao valor de "tipo"
 }
 \description{
-Funcao interna de parse_config para interpretar o parametro \code{modelos_previsao} da configuracao
+Converte configuracao de modelo de previsao em objeto S3 com classe
+definida pelo campo "tipo".
 }
+\keyword{internal}

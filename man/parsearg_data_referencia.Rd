@@ -5,7 +5,7 @@
 \alias{parsearg_data_referencia.numeric}
 \alias{parsearg_data_referencia.character}
 \alias{parsearg_data_referencia.list}
-\title{Interpretador De Chave \code{data_referencia}}
+\title{Parser de data_referencia}
 \usage{
 parsearg_data_referencia(x)
 
@@ -16,11 +16,23 @@ parsearg_data_referencia(x)
 \method{parsearg_data_referencia}{list}(x)
 }
 \arguments{
-\item{x}{valor da chave \code{data_referencia}; numerico ou vetor de duas strings de data}
+\item{x}{Valor da chave data_referencia}
 }
 \value{
-vetor \code{Date} de duas posicoes indicando inicio e fim da janela de simulacao
+Vetor Date ou lista de Dates
 }
 \description{
-Funcao interna de \code{parse_config} para interpretar o parametro \code{data_referencia} da configuracao
+Interpreta o parametro de data de referencia, que pode ser:
+\itemize{
+\item Numerico: numero de dias antes de hoje
+\item Character: data no formato "YYYY-MM-DD"
+\item Lista: combinacao dos anteriores
+}
+}
+\details{
+Para input numerico N, retorna intervalo de N+1 dias antes de hoje
+
+Para input character, converte diretamente para Date
+
+Para input lista, processa cada elemento recursivamente
 }

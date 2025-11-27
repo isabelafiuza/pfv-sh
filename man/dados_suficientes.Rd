@@ -2,29 +2,32 @@
 % Please edit documentation in R/train.r
 \name{dados_suficientes}
 \alias{dados_suficientes}
-\title{Verifica se ha dados suficientes para o ajuste}
+\title{Verifica Disponibilidade Minima de Dados}
 \usage{
 dados_suficientes(dt, num_min_dados)
 }
 \arguments{
-\item{dt}{\code{data.table} com data_hora, geracao, irradiancia,
-temperatura e umidade}
+\item{dt}{data.table com variaveis de interesse}
 
-\item{num_min_dados}{numero minimo de registros validos simultaneos}
+\item{num_min_dados}{Numero minimo de registros validos requeridos}
 }
 \value{
-TRUE se houver dados validos, FALSE caso contrario
+Logico: \code{TRUE} se dados suficientes, \code{FALSE} caso contrario
 }
 \description{
-Verifica se ha dados suficientes para o ajuste
+Avalia se ha registros validos suficientes para ajuste do modelo.
+Considera como invalidos: valores NA e valores zero.
 }
 \examples{
 \dontrun{
-dt <- data.table::data.table(
+dt <- data.table(
     data_hora = 1:5,
     ger = c(10, NA, 12, 0, 15),
     irr = c(200, 210, NA, 205, 215)
 )
-dados_suficientes(dt, num_min_dados = 2)
+dados_suficientes(dt, num_min_dados = 2)  # TRUE
+dados_suficientes(dt, num_min_dados = 5)  # FALSE
 }
+
 }
+\keyword{internal}

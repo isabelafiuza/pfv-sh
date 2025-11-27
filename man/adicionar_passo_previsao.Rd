@@ -2,18 +2,37 @@
 % Please edit documentation in R/utils.r
 \name{adicionar_passo_previsao}
 \alias{adicionar_passo_previsao}
-\title{Adiciona Passo De Previsao}
+\title{Adiciona Passo de Previsao}
 \usage{
 adicionar_passo_previsao(dt_prev)
 }
 \arguments{
-\item{dt_prev}{´data.table´ contendo os dados das variaveis previstas do modelo NWP}
+\item{dt_prev}{data.table com previsoes NWP contendo:
+\describe{
+\item{data_hora_rodada}{Data/hora da rodada do modelo}
+\item{data_hora_previsao}{Data/hora da previsao}
+}}
 }
 \value{
-´data.table´ das usinas simuladas e as respectivas variaveis previstas do modelo NWP
+data.table com coluna adicional \code{passo_prev}
 }
 \description{
-Obtem as previsoes dos modelos NWP para as usinas simuladas. Para isso, realiza a associacao das coordenadas das
-usinas com quadricula correspondente do modelo NWP.
-E escolhida a quadricula que apresenta menor distancia euclidiana entre seu centroide e a coordenada da usina.
+Calcula e adiciona coluna \code{passo_prev} indicando o horizonte
+de cada previsao em formato "D+N" (dias a frente da rodada).
 }
+\details{
+O passo e calculado como a diferenca em dias (ignorando horario)
+entre \code{data_hora_previsao} e \code{data_hora_rodada}.
+}
+\examples{
+\dontrun{
+dt <- data.table(
+    data_hora_rodada = as.POSIXct("2025-01-01", tz = "UTC"),
+    data_hora_previsao = as.POSIXct("2025-01-02 12:00:00", tz = "UTC")
+)
+adicionar_passo_previsao(dt)
+# passo_prev = "D+1"
+}
+
+}
+\keyword{internal}

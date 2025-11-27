@@ -2,16 +2,17 @@
 % Please edit documentation in R/config-file.r
 \name{valida_tipos_config}
 \alias{valida_tipos_config}
-\title{Valida Tipos Das Chaves Do Arquivo De Configuracao}
+\title{Valida Tipos das Chaves de Configuracao}
 \usage{
 valida_tipos_config(config)
 }
 \arguments{
-\item{config}{lista de configuracoes}
+\item{config}{Lista de configuracoes}
 }
 \value{
-NULL se config possui todos os tipos corretos; levanta erro do contrario
+\code{NULL} invisivel se valido; gera erro se tipos incorretos
 }
 \description{
-Checa se valores das chaves no arquivo lido sao dos tipos corretos
+Verifica se os valores possuem os tipos esperados.
 }
+\keyword{internal}

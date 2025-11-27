@@ -2,17 +2,18 @@
 % Please edit documentation in R/train.r
 \name{ajusta_dummy}
 \alias{ajusta_dummy}
-\title{Cria um modelo ARIMA dummy}
+\title{Cria Modelo ARIMA Dummy}
 \usage{
 ajusta_dummy(dt)
 }
 \arguments{
-\item{dt}{\code{data.table} com data_hora, geracao, irradiancia,
-temperatura e umidade do periodo de treinamento selecionado}
+\item{dt}{data.table com dados de treinamento (usado apenas para dimensionamento)}
 }
 \value{
-modelo ARIMA neutro
+Objeto Arima ajustado a serie constante zero
 }
 \description{
-Cria um modelo ARIMA dummy
+Cria um modelo ARIMA "neutro" para uso como fallback quando dados sao
+insuficientes ou ajuste falha. O modelo retorna previsoes zero.
 }
+\keyword{internal}

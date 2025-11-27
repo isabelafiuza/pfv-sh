@@ -2,7 +2,7 @@
 % Please edit documentation in R/utils.r
 \name{gera_combinacoes_modelo}
 \alias{gera_combinacoes_modelo}
-\title{Gera combinacoes entre nwp, passo de previsao e meia-hora}
+\title{Gera Combinacoes de Parametros para Modelagem}
 \usage{
 gera_combinacoes_modelo(
   v_modelos_nwp,
@@ -12,31 +12,41 @@ gera_combinacoes_modelo(
 )
 }
 \arguments{
-\item{v_modelos_nwp}{vetor com os nomes dos modelos meteorologicos, ex: c("GFS")}
+\item{v_modelos_nwp}{Vetor de modelos NWP (e.g., c("GFS", "ECMWF"))}
 
-\item{v_horizonte}{vetor de caracteres com os passos de previsao, ex: c("D+0", "D+1")}
+\item{v_horizonte}{Vetor de horizontes (e.g., c("D+0", "D+1"))}
 
-\item{periodo_ger}{vetor de horarios no formato HH:MM, ex: c("12:00", "12:30")}
+\item{periodo_ger}{Vetor de meias-horas com geracao (e.g., c("12:00", "12:30"))}
 
-\item{v_modelos_previsao}{vetor com os modelos de previsao}
+\item{v_modelos_previsao}{Tipo de modelo de previsao}
 }
 \value{
-lista com as colunas:
-\itemize{
-\item id_modelo_nwp - modelo meteorologico
-\item horiz_prev - passo de previsao
-\item periodo_ger - meias-horas com geracao solar
+Lista de listas, cada uma contendo:
+\describe{
+\item{id_modelo_nwp}{Modelo NWP}
+\item{horiz_prev}{Horizonte de previsao}
+\item{hora_min}{Meia-hora}
+\item{modelo_prev}{Tipo de modelo de previsao}
 }
 }
 \description{
-Cria uma lista com todas as combinacoes possiveis entre modelos meteorologicos,
-passos de previsao e meias-horas
+Cria lista com todas as combinacoes de modelo NWP, horizonte,
+meia-hora e tipo de modelo de previsao.
+}
+\details{
+Usa \code{data.table::CJ} para gerar produto cartesiano eficiente.
+O numero de combinacoes = |NWP| × |horizontes| × |meias-horas| × |modelos|.
 }
 \examples{
 \dontrun{
-v_nwp <- c("GFS", "ECMWF")
-v_horiz <- c("D+0", "D+1")
-v_hor_ger <- c("12:00", "12:30")
-gera_combinacoes_modelo(v_nwp, v_horiz, v_hor_ger, "arimax")
+gera_combinacoes_modelo(
+    v_modelos_nwp = c("GFS"),
+    v_horizonte = c("D+0", "D+1"),
+    periodo_ger = c("12:00", "12:30"),
+    v_modelos_previsao = "arimax"
+)
+# Retorna lista com 4 combinacoes
 }
+
 }
+\keyword{internal}

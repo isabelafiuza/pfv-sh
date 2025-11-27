@@ -1,9 +1,33 @@
-#' Constroi o interpretador de argumentos de linha de comando
+#' Constroi Parser de Argumentos CLI
 #'
-#' @return `ArgumentParser` com os argumentos suportados pelo modelo
+#' Cria um ArgumentParser configurado com os argumentos suportados
+#' pelo modelo de previsao solar fotovoltaica.
+#'
+#' @return Objeto \code{ArgumentParser} com argumentos configurados:
+#'   \describe{
+#'     \item{--datadir}{Diretorio de dados para execucao (default: "./data")}
+#'   }
+#'
+#' @details
+#' O parser e usado pelo \code{main.r} para processar argumentos de linha
+#' de comando. O diretorio de dados deve conter:
+#' \itemize{
+#'   \item config.jsonc - Arquivo de configuracao
+#'   \item usinas.csv - Cadastro de usinas
+#'   \item geracao_observada.csv - Dados de geracao historica
+#'   \item irradiancia_prevista.csv - Previsoes NWP
+#' }
+#'
+#' @examples
+#' \dontrun{
+#' parser <- get_parser()
+#' args <- parser$parse_args()
+#' print(args$datadir)
+#' }
+#'
+#' @seealso \code{\link[argparse]{ArgumentParser}}
 #'
 #' @export
-
 get_parser <- function() {
     parser <- ArgumentParser(description = "Modelo de Previsao de Geracao Solar Fotovoltaica Semihoraria")
 
@@ -13,13 +37,15 @@ get_parser <- function() {
 
 # AUXILIARES ---------------------------------------------------------------------------------------
 
-#' Auxiliar para adicionar argumentos genericos
+#' Adiciona Argumentos Genericos ao Parser
 #'
-#' Funcao interna, nao deve ser chamada diretamente pelo usuario
+#' Funcao interna que configura os argumentos padrao do CLI.
 #'
-#' @param parser objeto ArgumentParser para adicionar argumentos
+#' @param parser Objeto ArgumentParser
 #'
-#' @return parser com argumentos adicionados
+#' @return Parser com argumentos adicionados
+#'
+#' @keywords internal
 inner_parser_generic_args <- function(parser) {
     help_msg <- paste0("Diretorio de dados para execucao do modelo de previsao -- Veja ",
         "https://github.com/isabelafiuza/pfv-sh para detalhes")

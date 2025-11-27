@@ -1,3 +1,44 @@
+#' Executa Pipeline de Previsao
+#'
+#' Ponto de entrada principal para geracao de previsoes de geracao solar
+#' fotovoltaica usando modelos pre-treinados.
+#'
+#' @param args Lista de argumentos de configuracao contendo:
+#'   \describe{
+#'     \item{input}{Caminho para diretorio de dados de entrada}
+#'     \item{output}{Caminho para diretorio com artefatos de modelo}
+#'     \item{ids_usinas}{Vetor de IDs das usinas a processar}
+#'     \item{data_referencia}{Data de referencia para previsao}
+#'     \item{horizonte_dias}{Vetor de horizontes (e.g., c("D+0", "D+1"))}
+#'     \item{modelos_previsao}{Lista de configuracoes dos modelos}
+#'     \item{parametros_periodo_geracao}{Parametros de periodo solar}
+#'   }
+#'
+#' @return data.table com previsoes contendo colunas:
+#'   \describe{
+#'     \item{id_usina}{Identificador da usina}
+#'     \item{id_modelo_prev}{Tipo do modelo de previsao}
+#'     \item{id_modelo_nwp}{Modelo NWP utilizado}
+#'     \item{data_hora_rodada}{Data/hora da rodada}
+#'     \item{data_hora_previsao}{Data/hora da previsao}
+#'     \item{valor}{Geracao prevista (MW)}
+#'   }
+#'
+#' @details
+#' O pipeline de previsao executa os seguintes passos para cada usina:
+#' \enumerate{
+#'   \item Carrega artefatos de modelo treinado
+#'   \item Prepara dados NWP para o horizonte de previsao
+#'   \item Recalibra modelos com dados mais recentes
+#'   \item Gera previsoes para todas as combinacoes
+#'   \item Consolida resultados em data.table final
+#' }
+#'
+#' @seealso
+#' \code{\link{predict_usina}} para previsao de uma usina especifica
+#' \code{\link{parse_predict}} para dispatch de previsao por tipo de modelo
+#'
+#' @export
 predict_main <- function(args) {
     conn <- conectamock_pfv(args$input)
 
@@ -51,6 +92,22 @@ predict_main <- function(args) {
     return(dt_final)
 }
 
+#' Gera Previsoes para Uma Usina
+#'
+#' Executa o pipeline completo de previsao para uma usina especifica,
+#' usando artefatos de modelo previamente treinados.
+#'
+#' @param iu Identificador da usina (character)
+#' @param dt_usinas data.table com cadastro de usinas
+#' @param dt_ger_obs data.table com geracao observada
+#' @param dt_prev Lista de data.tables com previsoes meteorologicas
+#' @param parametros_modelo_previsao Lista com parametros dos modelos
+#' @param parametros_periodo_geracao Parametros de identificacao do periodo solar
+#' @param data_prev Vetor de datas-alvo de previsao
+#'
+#' @return Lista de previsoes, uma para cada combinacao de modelo treinado
+#'
+#' @keywords internal
 predict_usina <- function(
     iu, dt_usinas, dt_ger_obs, dt_prev, parametros_modelo_previsao,
     parametros_periodo_geracao, data_prev
@@ -92,13 +149,71 @@ predict_usina <- function(
     })
 }
 
+#' Metodo Generico para Previsao
+#'
+#' Funcao generica S3 que despacha para o metodo especifico de previsao
+#' baseado na classe do modelo.
+#'
+#' @param modelo Objeto do modelo treinado (com classe S3 definida)
+#' @param ... Argumentos adicionais passados aos metodos especificos
+#'
+#' @return Vetor numerico com valores previstos
+#'
+#' @seealso
+#' \code{\link{parse_predict.arimax}} para previsao ARIMAX
+#' \code{\link{parse_predict.fisico_estimado}} para previsao Fisico-Estimado
+#'
+#' @export
 parse_predict <- function(modelo, ...) UseMethod("parse_predict")
 
+#' Metodo Default para parse_predict
+#'
+#' Metodo default que gera erro para tipos de modelo nao suportados.
+#'
+#' @param modelo Objeto do modelo
+#' @param ... Argumentos adicionais (ignorados)
+#'
+#' @return Gera erro indicando tipo de modelo desconhecido
+#'
 #' @export
 parse_predict.default <- function(modelo, ...) {
     stop("Unknown model type for parse_predict")
 }
 
+#' Previsao com Modelo ARIMAX
+#'
+#' Gera previsoes usando modelo ARIMA/ARIMAX previamente treinado.
+#' O modelo e recalibrado com os dados mais recentes antes da previsao.
+#'
+#' @param modelo Lista contendo:
+#'   \describe{
+#'     \item{modelo_escolhido}{"ARIMA" ou "ARIMAX"}
+#'     \item{modelo_final}{Objeto Arima ajustado}
+#'   }
+#' @param ... Argumentos adicionais:
+#'   \describe{
+#'     \item{pars}{Combinacao de parametros (NWP, horizonte, meia-hora)}
+#'     \item{data_prev}{Vetor de datas-alvo}
+#'     \item{ger_usi}{data.table com geracao observada}
+#'     \item{prev_met_usi}{Lista de previsoes meteorologicas}
+#'     \item{modelo_parametros}{Parametros do modelo}
+#'     \item{v_horizonte}{Vetor de horizontes}
+#'   }
+#'
+#' @return Vetor numerico com valores previstos (MW), ou NA se dados insuficientes
+#'
+#' @details
+#' O metodo:
+#' \enumerate{
+#'   \item Separa dados em treino e previsao
+#'   \item Normaliza variaveis usando estatisticas do treino
+#'   \item Recalibra modelo com dados mais recentes
+#'   \item Gera previsao para horizonte especificado
+#'   \item Desnormaliza resultado para escala original
+#' }
+#'
+#' @seealso \code{\link{recalibra_arimax}}, \code{\link{desnormaliza_variaveis}}
+#'
 #' @export
 parse_predict.arimax <- function(modelo, ...) {
     args <- list(...)
@@ -177,6 +292,32 @@ parse_predict.arimax <- function(modelo, ...) {
     }
 }
 
+#' Previsao com Modelo Fisico-Estimado
+#'
+#' Gera previsoes usando modelo de regressao linear (RLS ou RLM)
+#' previamente treinado.
+#'
+#' @param modelo Lista contendo:
+#'   \describe{
+#'     \item{modelo_escolhido}{"RLS" ou "RLM"}
+#'     \item{modelo_final}{Objeto lm ajustado}
+#'     \item{variaveis_usadas}{Nomes das variaveis do modelo}
+#'   }
+#' @param ... Argumentos adicionais:
+#'   \describe{
+#'     \item{pars}{Combinacao de parametros (NWP, horizonte, meia-hora)}
+#'     \item{data_prev}{Vetor de datas-alvo}
+#'     \item{ger_usi}{data.table com geracao observada}
+#'     \item{prev_met_usi}{Lista de previsoes meteorologicas}
+#'     \item{v_horizonte}{Vetor de horizontes}
+#'   }
+#'
+#' @return Vetor numerico com valores previstos (MW)
+#'
+#' @details
+#' O metodo aplica diretamente o modelo de regressao as variaveis
+#' meteorologicas previstas, sem necessidade de normalizacao.
+#'
 #' @export
 parse_predict.fisico_estimado <- function(modelo, ...) {
     args <- list(...)
@@ -209,17 +350,39 @@ parse_predict.fisico_estimado <- function(modelo, ...) {
 
 # AUXILIARES ---------------------------------------------------------------------------------------
 
+#' Carrega Artefato de Modelo
+#'
+#' Le arquivo RDS contendo modelo treinado para uma usina.
+#'
+#' @param modelo_previsao Tipo do modelo ("arimax", "fisico_estimado")
+#' @param id_usina Identificador da usina
+#' @param diretorio Caminho para diretorio de artefatos
+#'
+#' @return Objeto do modelo carregado
+#'
+#' @keywords internal
 carrega_modelo_rds <- function(modelo_previsao, id_usina, diretorio) {
     mod_aju <- readRDS(paste(diretorio, paste0(id_usina, "_", modelo_previsao, "_ajustado.rds"), sep = "/"))
     return(mod_aju)
 }
 
-#' Recalibra modelo ARIMA simples
+#' Recalibra Modelo ARIMA
 #'
-#' @param dt data.table com variavel \code{ger_obs_norm}.
-#' @param nlmod0 modelo ajustado pela etapa de treinamento.
+#' Reajusta modelo ARIMA mantendo a estrutura (p, d, q) mas atualizando
+#' os coeficientes com dados mais recentes.
 #'
-#' @return modelo recalibrado do tipo \code{Arima}.
+#' @param dt data.table com coluna \code{ger_obs_norm} (geracao normalizada)
+#' @param nlmod0 Modelo ARIMA original da etapa de treinamento
+#'
+#' @return Objeto Arima recalibrado
+#'
+#' @details
+#' Usa \code{Arima(..., model = nlmod0)} para manter a estrutura
+#' do modelo original enquanto atualiza os parametros.
+#'
+#' @seealso \code{\link[forecast]{Arima}}
+#'
+#' @keywords internal
 recalibra_arima <- function(dt, nlmod0) {
     y <- dt$ger_obs_norm
     y_validos <- y[!is.na(y)]
@@ -227,13 +390,24 @@ recalibra_arima <- function(dt, nlmod0) {
     nlmod1 <- Arima(y_validos, model = nlmod0)
 }
 
-#' Recalibra modelo ARIMAX com variaveis exogenas
+#' Recalibra Modelo ARIMAX
 #'
-#' @param dt data.table com variavel \code{ger_obs_norm}, \code{irrad_prev_norm},
-#' \code{temp_prev_norm} e \code{umid_prev_norm}.
-#' @param nlmod0 modelo ajustado pela etapa de treinamento.
+#' Reajusta modelo ARIMAX mantendo a estrutura mas atualizando
+#' os coeficientes com dados mais recentes.
 #'
-#' @return modelo recalibrado do tipo \code{Arimax}.
+#' @param dt data.table com colunas \code{ger_obs_norm} e variaveis exogenas
+#'   normalizadas (sufixo \code{_norm})
+#' @param nlmod0 Modelo ARIMAX original da etapa de treinamento
+#'
+#' @return Objeto Arima recalibrado com variaveis exogenas
+#'
+#' @details
+#' Filtra registros completos (sem NA em nenhuma variavel) antes
+#' de recalibrar o modelo.
+#'
+#' @seealso \code{\link[forecast]{Arima}}
+#'
+#' @keywords internal
 recalibra_arimax <- function(dt, nlmod0) {
     var_exog <- setdiff(names(dt), "ger_obs_norm")
     dt_valido <- dt[complete.cases(dt[, c("ger_obs_norm", ..var_exog)])]
@@ -246,12 +420,28 @@ recalibra_arimax <- function(dt, nlmod0) {
     )
 }
 
-#' Desnormaliza variaveis com base em estatisticas de normalizacao
+#' Desnormaliza Variaveis
 #'
-#' @param dt data.table com colunas normalizadas (ex: *_norm)
-#' @param stats_norm data.table com colunas: variavel, med, sd
+#' Reverte a normalizacao z-score aplicada as previsoes,
+#' retornando valores a escala original.
 #'
-#' @return data.table com colunas desnormalizadas (sem sufixo "_norm")
+#' @param dt data.table com colunas normalizadas (sufixo \code{_norm})
+#' @param stats_norm data.table com estatisticas de normalizacao:
+#'   \describe{
+#'     \item{variavel}{Nome da variavel original}
+#'     \item{med}{Media usada na normalizacao}
+#'     \item{sd}{Desvio padrao usado na normalizacao}
+#'   }
+#'
+#' @return data.table com colunas desnormalizadas (sem sufixo \code{_norm})
+#'
+#' @details
+#' Aplica a transformacao inversa:
+#' \deqn{X = X_{norm} \times \sigma_X + \bar{X}}
+#'
+#' @seealso \code{\link{normaliza_variaveis}}
+#'
+#' @keywords internal
 desnormaliza_variaveis <- function(dt, stats_norm) {
     dt_out <- copy(dt)
 

@@ -2,26 +2,29 @@
 % Please edit documentation in R/utils.r
 \name{define_hor_prev}
 \alias{define_hor_prev}
-\title{Gera vetor de datas-alvo de previsao}
+\title{Gera Vetor de Datas-Alvo de Previsao}
 \usage{
 define_hor_prev(data_referencia, v_horizonte)
 }
 \arguments{
-\item{data_referencia}{\code{Date} ou \code{character} coerente com formato de data.
-Representa a data-base da execucao da previsao (ex: "2025-11-07").}
+\item{data_referencia}{Data base da execucao, como \code{Date} ou
+\code{character} no formato "YYYY-MM-DD"}
 
-\item{v_horizonte}{Vetor indicando os horizontes de previsao.}
+\item{v_horizonte}{Vetor de horizontes de previsao (e.g., c("D+0", "D+1")).
+O comprimento deste vetor determina o numero de datas retornadas.}
 }
 \value{
-Vetor de classe \code{Date} contendo as datas alvo de previsao.
+Vetor de classe \code{Date} com as datas-alvo de previsao
 }
 \description{
-Esta funcao cria um vetor de datas correspondentes aos horizontes de previsao,
-com base em uma data de referencia (default: o dia de execucao da previsao)
-e em um vetor de horizontes (D+0 a D+9).
+Cria um vetor de datas correspondentes aos horizontes de previsao,
+a partir de uma data de referencia.
 }
 \examples{
 define_hor_prev("2025-11-07", c("D+0", "D+1"))
 # Retorna: 2025-11-07, 2025-11-08
+
+define_hor_prev("2025-01-01", c("D+0", "D+1", "D+2", "D+3"))
+# Retorna: 2025-01-01, 2025-01-02, 2025-01-03, 2025-01-04
 
 }

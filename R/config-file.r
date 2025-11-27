@@ -1,9 +1,26 @@
-#' Interpreta Arquivo De Configuracao
+#' Interpreta Arquivo de Configuracao
 #'
-#' @param config lista nomeada de configuracoes lida do arquivo
-#' @param conn objeto de conexao com um banco
+#' Valida e transforma os valores do arquivo de configuracao,
+#' convertendo tipos e resolvendo referencias.
 #'
-#' @return lista de argumentos interpretados
+#' @param config Lista nomeada de configuracoes (lida de JSON/JSONC)
+#' @param conn Objeto de conexao com banco de dados (via pfvIO)
+#'
+#' @return Lista de argumentos interpretados com tipos corretos
+#'
+#' @details
+#' A funcao executa:
+#' \enumerate{
+#'   \item Valida presenca de todas as chaves obrigatorias
+#'   \item Valida tipos dos valores
+#'   \item Converte \code{modelos_previsao} para objetos S3
+#'   \item Converte \code{data_referencia} para Date
+#'   \item Resolve \code{ids_usinas} vazio para todas as usinas
+#'   \item Converte listas para vetores onde apropriado
+#' }
+#'
+#' @seealso
+#' \code{\link{valida_nomes_config}}, \code{\link{valida_tipos_config}}
 #'
 #' @export
 parse_config <- function(config, conn) {
@@ -20,13 +37,15 @@ parse_config <- function(config, conn) {
 
 # VALIDACOES DE CONFIG -----------------------------------------------------------------------------
 
-#' Valida Chaves Do Arquivo De Configuracao
+#' Valida Chaves do Arquivo de Configuracao
 #'
-#' Checa se um arquivo de configuracao lido possui todas as chaves necessarias
+#' Verifica se todas as chaves obrigatorias estao presentes.
 #'
-#' @param config lista de configuracoes
+#' @param config Lista de configuracoes
 #'
-#' @return NULL se config possui todas as chaves; levanta erro do contrario
+#' @return \code{NULL} invisivel se valido; gera erro se chaves faltantes
+#'
+#' @keywords internal
 valida_nomes_config <- function(config) {
     nomes <- config_names()
 
@@ -42,6 +61,10 @@ valida_nomes_config <- function(config) {
     invisible(NULL)
 }
 
+#' Retorna Nomes das Chaves Obrigatorias
+#'
+#' @return Vetor de strings com nomes das chaves de configuracao
+#' @keywords internal
 config_names <- function() {
     c(
         "mode", "input", "output", "artifact", "ids_usinas", "data_referencia", "horizonte_dias",
@@ -49,13 +72,15 @@ config_names <- function() {
     )
 }
 
-#' Valida Tipos Das Chaves Do Arquivo De Configuracao
+#' Valida Tipos das Chaves de Configuracao
 #'
-#' Checa se valores das chaves no arquivo lido sao dos tipos corretos
+#' Verifica se os valores possuem os tipos esperados.
 #'
-#' @param config lista de configuracoes
+#' @param config Lista de configuracoes
 #'
-#' @return NULL se config possui todos os tipos corretos; levanta erro do contrario
+#' @return \code{NULL} invisivel se valido; gera erro se tipos incorretos
+#'
+#' @keywords internal
 valida_tipos_config <- function(config) {
     tipos <- config_types()
 
@@ -73,6 +98,10 @@ valida_tipos_config <- function(config) {
     invisible(NULL)
 }
 
+#' Retorna Tipos Esperados por Chave
+#'
+#' @return Lista nomeada com tipos esperados para cada chave
+#' @keywords internal
 config_types <- function() {
     structure(
         list(
@@ -84,28 +113,28 @@ config_types <- function() {
     )
 }
 
-#' Validacao Singular De Uma Chave
+#' Valida Tipos de Uma Chave (Escalar ou Lista)
 #'
-#' Funcao interna auxiliar de `valida_tipos_config`
+#' Verifica se todos os elementos de uma chave possuem tipos validos.
 #'
-#' Tanto `l` quanto `tipos` podem ser escalares, vetores ou listas. No caso de `l`, cada elemento sera checado
-#' individualmente. Se `tipos` for uma lista, `l` sera checado contra cada um dos tipos e retorna
-#' `TRUE` se a correspondencia for valida
+#' @param l Valor da chave (escalar, vetor ou lista)
+#' @param tipos Tipos esperados (character, ou lista para multiplos tipos aceitos)
 #'
-#' @param l valor de uma chave do arquivo de configuracao, escalar ou lista
-#' @param tipos tipos esperados de `l`, escalar ou lista
+#' @return Logico indicando se validacao passou
 #'
-#' @return booleano indicando se validacao encerrou com sucesso ou nao
+#' @keywords internal
 valid_tipos <- function(l, tipos) all(sapply(l, valid_tipos_unit, tipos = tipos))
 
-#' Auxiliar De `valid_tipos`
+#' Valida Tipo de Um Elemento
 #'
-#' Funcao interna para isolar o loop ao longo de `l` em `valid_tipos`
+#' Funcao auxiliar para validacao unitaria de tipo.
 #'
-#' @param x escalar, vetor ou lista, elemento de uma chave do arquivo de configuracao
-#' @param tipos tipos esperados de `x`, escalar, vetor ou lista
+#' @param x Elemento a validar
+#' @param tipos Tipos esperados
 #'
-#' @return booleano indicando se validacao encerrou com sucesso ou nao
+#' @return Logico indicando se tipo e valido
+#'
+#' @keywords internal
 valid_tipos_unit <- function(x, tipos) {
     tipos <- unlist(tipos)
     if (!is.list(x)) {
@@ -117,80 +146,93 @@ valid_tipos_unit <- function(x, tipos) {
 
 # PARSERS ------------------------------------------------------------------------------------------
 
-#' Interpretador De Chave `data_referencia`
+#' Parser de data_referencia
 #'
-#' Funcao interna de `parse_config` para interpretar o parametro `data_referencia` da configuracao
+#' Interpreta o parametro de data de referencia, que pode ser:
+#' \itemize{
+#'   \item Numerico: numero de dias antes de hoje
+#'   \item Character: data no formato "YYYY-MM-DD"
+#'   \item Lista: combinacao dos anteriores
+#' }
 #'
-#' @param x valor da chave `data_referencia`; numerico ou vetor de duas strings de data
+#' @param x Valor da chave data_referencia
 #'
-#' @return vetor `Date` de duas posicoes indicando inicio e fim da janela de simulacao
+#' @return Vetor Date ou lista de Dates
 #'
 #' @export
 parsearg_data_referencia <- function(x) UseMethod("parsearg_data_referencia")
 
 #' @rdname parsearg_data_referencia
+#' @details Para input numerico N, retorna intervalo de N+1 dias antes de hoje
 #' @export
 parsearg_data_referencia.numeric <- function(x) Sys.Date() - c(x + 1, 1)
 
 #' @rdname parsearg_data_referencia
+#' @details Para input character, converte diretamente para Date
 #' @export
 parsearg_data_referencia.character <- function(x) as.Date(x)
 
 #' @rdname parsearg_data_referencia
+#' @details Para input lista, processa cada elemento recursivamente
 #' @export
 parsearg_data_referencia.list <- function(x) {
     lapply(x, function(elem) parsearg_data_referencia(elem))
 }
 
-#' Interpretador De Chave `ids_usinas`
+#' Parser de ids_usinas
 #'
-#' Funcao interna de `parse_config` para interpretar o parametro `ids_usinas` da configuracao
+#' Interpreta lista de IDs de usinas. Se vazia, retorna todas as usinas
+#' disponiveis no banco de dados.
 #'
-#' @param x valor da chave `ids_usinas`; lista vazia ou de codigos de usinas
-#' @param conn objeto de conexao com um banco
+#' @param x Lista de IDs de usinas (pode ser vazia)
+#' @param conn Objeto de conexao com banco de dados
 #'
-#' @return se `x` era uma lista vazia, retorna um vetor com todos os ids no banco `conn`; do
-#'     contrario retorna `x` vetorizado
-
+#' @return Vetor character com IDs unicos de usinas
+#'
+#' @keywords internal
 parsearg_ids_usinas <- function(x, conn) {
     if (length(x) == 0) x <- get_usinas(conn)$id_usina else x <- unlist(x)
     return(unique(x))
 }
 
-#' Interpretador De Chave `horizonte_dias`
+#' Parser de horizonte_dias
 #'
-#' Funcao interna de parse_config para interpretar o parametro `horizonte_dias` da configuracao
+#' Converte lista de horizontes para vetor character.
 #'
-#' @param x valor da chave `horizonte_dias`; lista de strings com horizontes
+#' @param x Lista de strings com horizontes (e.g., list("D+0", "D+1"))
 #'
-#' @return vetor de strings com horizontes
-
+#' @return Vetor character com horizontes
+#'
+#' @keywords internal
 parsearg_horizonte_dias <- function(x) {
     x <- unlist(x)
     return(x)
 }
 
-#' Interpretador De Chave `modelos_NWP`
+#' Parser de modelos_NWP
 #'
-#' Funcao interna de parse_config para interpretar o parametro `modelos_NWP` da configuracao
+#' Converte lista de modelos NWP para vetor character.
 #'
-#' @param x valor da chave `modelos_NWP`; lista de modelos NWP
+#' @param x Lista de strings com modelos NWP (e.g., list("GFS", "ECMWF"))
 #'
-#' @return vetor de strings com modelos NWP
-
+#' @return Vetor character com modelos NWP
+#'
+#' @keywords internal
 parsearg_modelos_nwp <- function(x) {
     x <- unlist(x)
     return(x)
 }
 
-#' Interpretador De Chave `modelos_previsao`
+#' Parser de modelos_previsao
 #'
-#' Funcao interna de parse_config para interpretar o parametro `modelos_previsao` da configuracao
+#' Converte configuracao de modelo de previsao em objeto S3 com classe
+#' definida pelo campo "tipo".
 #'
-#' @param x valor da chave `modelos_previsao`; lista com parametros do modelo
+#' @param x Lista com parametros do modelo, incluindo campo "tipo"
 #'
-#' @return lista com classe definida pelo tipo do modelo
-
+#' @return Lista com classe S3 igual ao valor de "tipo"
+#'
+#' @keywords internal
 parsearg_modelos_previsao <- function(x) {
     nome <- x$tipo
     class(x) <- nome

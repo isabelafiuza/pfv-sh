@@ -2,18 +2,49 @@
 % Please edit documentation in R/train.r
 \name{parse_train.arimax}
 \alias{parse_train.arimax}
-\title{Treinamento Usando O Metodo ARIMAX}
+\title{Treinamento de Modelo ARIMAX}
 \usage{
 \method{parse_train}{arimax}(modelo_parametros, ...)
 }
 \arguments{
-\item{modelo_parametros}{lista com parametros do modelo}
+\item{modelo_parametros}{Lista com parametros do modelo:
+\describe{
+\item{n_dias_treino}{Numero de dias para janela de treinamento}
+\item{amos_min}{Numero minimo de amostras validas requeridas}
+}}
 
-\item{...}{argumentos adicionais incluindo pars, ger_usi, prev_met_usi, data_fim_treino}
+\item{...}{Argumentos adicionais:
+\describe{
+\item{pars}{Lista com combinacao de parametros (NWP, horizonte, meia-hora)}
+\item{ger_usi}{data.table com geracao observada}
+\item{prev_met_usi}{Lista de data.tables com previsoes meteorologicas}
+\item{data_fim_treino}{Data limite para dados de treinamento}
+}}
 }
 \value{
-modelos ajustados
+Lista contendo:
+\describe{
+\item{modelo_escolhido}{"ARIMA" ou "ARIMAX"}
+\item{modelo_final}{Objeto Arima ajustado}
+}
+Se dados insuficientes, retorna modelo dummy (Arima).
 }
 \description{
-Treinamento Usando O Metodo ARIMAX
+Treina um modelo ARIMA com variaveis exogenas (ARIMAX) para previsao
+de geracao solar. Utiliza selecao automatica de ordem via \code{auto.arima}.
+}
+\details{
+O metodo executa:
+\enumerate{
+\item Filtra dados pela combinacao NWP × horizonte × meia-hora
+\item Substitui valores 999 por NA
+\item Normaliza variaveis (z-score)
+\item Ajusta modelo ARIMA puro via \code{auto.arima}
+\item Ajusta modelo ARIMAX com irradiancia como variavel exogena
+\item Seleciona melhor modelo por AICc + erro medio absoluto
+}
+}
+\seealso{
+\code{\link[forecast]{auto.arima}}
+\code{\link{ajusta_arima}}, \code{\link{ajusta_arimax}}
 }

@@ -7,7 +7,7 @@
 calcula_erros(dt, nlmod1, nlmod2)
 }
 \arguments{
-\item{dt}{data.table com variável \code{ger_obs_norm}, \code{irrad_prev_norm},
+\item{dt}{data.table com variavel \code{ger_obs_norm}, \code{irrad_prev_norm},
 \code{temp_prev_norm} e \code{umid_prev_norm}..}
 
 \item{nlmod1}{Modelo ARIMA.}
@@ -15,7 +15,7 @@ calcula_erros(dt, nlmod1, nlmod2)
 \item{nlmod2}{Modelo ARIMAX.}
 }
 \value{
-Lista com erro médio de cada modelo.
+Lista com erro medio de cada modelo.
 }
 \description{
 Calcula erros medios in-sample dos modelos

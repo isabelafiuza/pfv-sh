@@ -2,19 +2,22 @@
 % Please edit documentation in R/utils.r
 \name{cria_sequencia_datas}
 \alias{cria_sequencia_datas}
-\title{Cria Sequencia De Datas}
+\title{Cria Sequencia de Datas para Interpolacao}
 \usage{
 cria_sequencia_datas(dt, discretizacao)
 }
 \arguments{
-\item{dt}{data.table com dados de previsao}
+\item{dt}{data.table com previsoes contendo colunas de agrupamento
+e \code{data_hora_previsao}}
 
-\item{discretizacao}{intervalo de tempo entre datas, ex: "30 min"}
+\item{discretizacao}{Intervalo de tempo para a sequencia (e.g., "30 min", "1 hour")}
 }
 \value{
-data.table com sequencia completa de datas
+data.table com colunas de agrupamento e \code{data_hora_previsao}
+preenchida com sequencia completa
 }
 \description{
-Identifica as datas de inicio e fim das series temporais
-e cria dt com a sequencia completa de datas
+Gera data.table com sequencia completa de timestamps entre
+inicio e fim de cada serie temporal.
 }
+\keyword{internal}

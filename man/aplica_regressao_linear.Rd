@@ -7,16 +7,28 @@
 aplica_regressao_linear(dt_y, dt_x, nlmod0)
 }
 \arguments{
-\item{dt_y}{´data.table´ contendo a variavel resposta. Exemplo: geracao observada}
+\item{dt_y}{data.table contendo a variavel resposta (e.g., geracao observada)}
 
-\item{dt_x}{´data.table´ contendo a(s) variavel(is) explicativas. Exemplo: irradiancia, umidade e temperatura
-As observacoes contidas nos data.tables contendo as variaveis ja devem estar em posicoes compativeis}
+\item{dt_x}{data.table contendo a(s) variavel(is) explicativa(s)
+(e.g., irradiancia, umidade, temperatura). As observacoes devem estar
+alinhadas com \code{dt_y}.}
 
-\item{nlmod0}{modelo de fallback em caso de erro no ajuste}
+\item{nlmod0}{Modelo de fallback retornado em caso de erro no ajuste.
+Se \code{NULL}, erro e propagado.}
 }
 \value{
-modelos ajustados
+Objeto \code{lm} com o modelo ajustado
 }
 \description{
-Funcao que aplica regressao linear a um conjunto de dados
+Ajusta um modelo de regressao linear a um conjunto de dados,
+com fallback para modelo dummy em caso de erro.
 }
+\examples{
+\dontrun{
+dt_y <- data.table(ger_obs = c(10, 20, 30))
+dt_x <- data.table(irrad = c(100, 200, 300))
+modelo <- aplica_regressao_linear(dt_y, dt_x)
+}
+
+}
+\keyword{internal}

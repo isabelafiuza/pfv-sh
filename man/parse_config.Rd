@@ -2,18 +2,33 @@
 % Please edit documentation in R/config-file.r
 \name{parse_config}
 \alias{parse_config}
-\title{Interpreta Arquivo De Configuracao}
+\title{Interpreta Arquivo de Configuracao}
 \usage{
 parse_config(config, conn)
 }
 \arguments{
-\item{config}{lista nomeada de configuracoes lida do arquivo}
+\item{config}{Lista nomeada de configuracoes (lida de JSON/JSONC)}
 
-\item{conn}{objeto de conexao com um banco}
+\item{conn}{Objeto de conexao com banco de dados (via pfvIO)}
 }
 \value{
-lista de argumentos interpretados
+Lista de argumentos interpretados com tipos corretos
 }
 \description{
-Interpreta Arquivo De Configuracao
+Valida e transforma os valores do arquivo de configuracao,
+convertendo tipos e resolvendo referencias.
+}
+\details{
+A funcao executa:
+\enumerate{
+\item Valida presenca de todas as chaves obrigatorias
+\item Valida tipos dos valores
+\item Converte \code{modelos_previsao} para objetos S3
+\item Converte \code{data_referencia} para Date
+\item Resolve \code{ids_usinas} vazio para todas as usinas
+\item Converte listas para vetores onde apropriado
+}
+}
+\seealso{
+\code{\link{valida_nomes_config}}, \code{\link{valida_tipos_config}}
 }

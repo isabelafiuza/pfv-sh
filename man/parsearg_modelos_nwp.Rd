@@ -2,16 +2,17 @@
 % Please edit documentation in R/config-file.r
 \name{parsearg_modelos_nwp}
 \alias{parsearg_modelos_nwp}
-\title{Interpretador De Chave \code{modelos_NWP}}
+\title{Parser de modelos_NWP}
 \usage{
 parsearg_modelos_nwp(x)
 }
 \arguments{
-\item{x}{valor da chave \code{modelos_NWP}; lista de modelos NWP}
+\item{x}{Lista de strings com modelos NWP (e.g., list("GFS", "ECMWF"))}
 }
 \value{
-vetor de strings com modelos NWP
+Vetor character com modelos NWP
 }
 \description{
-Funcao interna de parse_config para interpretar o parametro \code{modelos_NWP} da configuracao
+Converte lista de modelos NWP para vetor character.
 }
+\keyword{internal}

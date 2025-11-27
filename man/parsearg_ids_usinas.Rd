@@ -2,19 +2,20 @@
 % Please edit documentation in R/config-file.r
 \name{parsearg_ids_usinas}
 \alias{parsearg_ids_usinas}
-\title{Interpretador De Chave \code{ids_usinas}}
+\title{Parser de ids_usinas}
 \usage{
 parsearg_ids_usinas(x, conn)
 }
 \arguments{
-\item{x}{valor da chave \code{ids_usinas}; lista vazia ou de codigos de usinas}
+\item{x}{Lista de IDs de usinas (pode ser vazia)}
 
-\item{conn}{objeto de conexao com um banco}
+\item{conn}{Objeto de conexao com banco de dados}
 }
 \value{
-se \code{x} era uma lista vazia, retorna um vetor com todos os ids no banco \code{conn}; do
-contrario retorna \code{x} vetorizado
+Vetor character com IDs unicos de usinas
 }
 \description{
-Funcao interna de \code{parse_config} para interpretar o parametro \code{ids_usinas} da configuracao
+Interpreta lista de IDs de usinas. Se vazia, retorna todas as usinas
+disponiveis no banco de dados.
 }
+\keyword{internal}

@@ -2,16 +2,17 @@
 % Please edit documentation in R/config-file.r
 \name{parsearg_horizonte_dias}
 \alias{parsearg_horizonte_dias}
-\title{Interpretador De Chave \code{horizonte_dias}}
+\title{Parser de horizonte_dias}
 \usage{
 parsearg_horizonte_dias(x)
 }
 \arguments{
-\item{x}{valor da chave \code{horizonte_dias}; lista de strings com horizontes}
+\item{x}{Lista de strings com horizontes (e.g., list("D+0", "D+1"))}
 }
 \value{
-vetor de strings com horizontes
+Vetor character com horizontes
 }
 \description{
-Funcao interna de parse_config para interpretar o parametro \code{horizonte_dias} da configuracao
+Converte lista de horizontes para vetor character.
 }
+\keyword{internal}

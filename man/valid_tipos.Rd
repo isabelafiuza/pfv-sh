@@ -2,23 +2,19 @@
 % Please edit documentation in R/config-file.r
 \name{valid_tipos}
 \alias{valid_tipos}
-\title{Validacao Singular De Uma Chave}
+\title{Valida Tipos de Uma Chave (Escalar ou Lista)}
 \usage{
 valid_tipos(l, tipos)
 }
 \arguments{
-\item{l}{valor de uma chave do arquivo de configuracao, escalar ou lista}
+\item{l}{Valor da chave (escalar, vetor ou lista)}
 
-\item{tipos}{tipos esperados de \code{l}, escalar ou lista}
+\item{tipos}{Tipos esperados (character, ou lista para multiplos tipos aceitos)}
 }
 \value{
-booleano indicando se validacao encerrou com sucesso ou nao
+Logico indicando se validacao passou
 }
 \description{
-Funcao interna auxiliar de \code{valida_tipos_config}
+Verifica se todos os elementos de uma chave possuem tipos validos.
 }
-\details{
-Tanto \code{l} quanto \code{tipos} podem ser escalares, vetores ou listas. No caso de \code{l}, cada elemento sera checado
-individualmente. Se \code{tipos} for uma lista, \code{l} sera checado contra cada um dos tipos e retorna
-\code{TRUE} se a correspondencia for valida
-}
+\keyword{internal}

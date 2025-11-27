@@ -2,18 +2,27 @@
 % Please edit documentation in R/predict.r
 \name{recalibra_arima}
 \alias{recalibra_arima}
-\title{Recalibra modelo ARIMA simples}
+\title{Recalibra Modelo ARIMA}
 \usage{
 recalibra_arima(dt, nlmod0)
 }
 \arguments{
-\item{dt}{data.table com variavel \code{ger_obs_norm}.}
+\item{dt}{data.table com coluna \code{ger_obs_norm} (geracao normalizada)}
 
-\item{nlmod0}{modelo ajustado pela etapa de treinamento.}
+\item{nlmod0}{Modelo ARIMA original da etapa de treinamento}
 }
 \value{
-modelo recalibrado do tipo \code{Arima}.
+Objeto Arima recalibrado
 }
 \description{
-Recalibra modelo ARIMA simples
+Reajusta modelo ARIMA mantendo a estrutura (p, d, q) mas atualizando
+os coeficientes com dados mais recentes.
 }
+\details{
+Usa \code{Arima(..., model = nlmod0)} para manter a estrutura
+do modelo original enquanto atualiza os parametros.
+}
+\seealso{
+\code{\link[forecast]{Arima}}
+}
+\keyword{internal}

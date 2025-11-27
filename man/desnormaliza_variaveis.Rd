@@ -2,18 +2,32 @@
 % Please edit documentation in R/predict.r
 \name{desnormaliza_variaveis}
 \alias{desnormaliza_variaveis}
-\title{Desnormaliza variaveis com base em estatisticas de normalizacao}
+\title{Desnormaliza Variaveis}
 \usage{
 desnormaliza_variaveis(dt, stats_norm)
 }
 \arguments{
-\item{dt}{data.table com colunas normalizadas (ex: *_norm)}
+\item{dt}{data.table com colunas normalizadas (sufixo \code{_norm})}
 
-\item{stats_norm}{data.table com colunas: variavel, med, sd}
+\item{stats_norm}{data.table com estatisticas de normalizacao:
+\describe{
+\item{variavel}{Nome da variavel original}
+\item{med}{Media usada na normalizacao}
+\item{sd}{Desvio padrao usado na normalizacao}
+}}
 }
 \value{
-data.table com colunas desnormalizadas (sem sufixo "_norm")
+data.table com colunas desnormalizadas (sem sufixo \code{_norm})
 }
 \description{
-Desnormaliza variaveis com base em estatisticas de normalizacao
+Reverte a normalizacao z-score aplicada as previsoes,
+retornando valores a escala original.
 }
+\details{
+Aplica a transformacao inversa:
+\deqn{X = X_{norm} \times \sigma_X + \bar{X}}
+}
+\seealso{
+\code{\link{normaliza_variaveis}}
+}
+\keyword{internal}

@@ -2,43 +2,44 @@
 % Please edit documentation in R/utils.r
 \name{identifica_periodo_ger}
 \alias{identifica_periodo_ger}
-\title{Identifica periodo do dia com geracao solar}
+\title{Identifica Periodo de Geracao Solar}
 \usage{
 identifica_periodo_ger(dad_usina, ger_usi, fator_tol_ger, fator_tol_horas)
 }
 \arguments{
-\item{dad_usina}{data.table contendo pelo menos:
-\itemize{
-\item id_usina
-\item potencia instalada
+\item{dad_usina}{data.table com dados cadastrais da usina:
+\describe{
+\item{id_usina}{Identificador da usina}
+\item{capacidade_instalada_MW}{Capacidade instalada em MW}
 }}
 
-\item{ger_usi}{data.table contendo pelo menos:
-\itemize{
-\item data_hora_observacao
-\item valor
+\item{ger_usi}{data.table com geracao observada:
+\describe{
+\item{data_hora_observacao}{Timestamp da observacao}
+\item{valor}{Geracao em MW}
 }}
 
-\item{fator_tol_ger}{fator minimo da capacidade instalada da usina para considerar
-que houve geracao}
+\item{fator_tol_ger}{Fator minimo da capacidade para considerar geracao
+significativa (e.g., 0.01 = 1\% da capacidade)}
 
-\item{fator_tol_horas}{fator minimo dos dias analisados com geracao}
+\item{fator_tol_horas}{Fracao minima de dias com geracao para validar
+um horario (e.g., 0.9 = 90\% dos dias)}
 }
 \value{
-vetor de characteres com as meias-horas ("HH:MM")
+Vetor de strings no formato "HH:MM" com meias-horas validas
 }
 \description{
-A funcao identifica horarios ("HH:MM") em que ha geracao
-ao longo de um ano.
-Util para definir periodo em que havera treinamento de modelos
-e previsao de geracao solar
+Determina as meias-horas do dia em que ha geracao solar significativa,
+baseado em analise historica.
 }
 \details{
-A funcao segue as etapas:
-\itemize{
-\item extrai a meia-hora, hora_min, de cada observacao
-\item seleciona os dias para analise
-\item para cada meia-hora, conta o numero de dias com geracao superior ao limiar estabelecido
-\item retorna as meias-horas com geracao em pelo menos \code{fator_tol_dias*janela_dias} dias.
+A funcao analisa os ultimos 300 dias de geracao e:
+\enumerate{
+\item Extrai meia-hora de cada observacao
+\item Conta dias com geracao > fator_tol_ger × capacidade
+\item Retorna horarios com geracao em >= fator_tol_horas × dias
 }
+
+Util para excluir horarios noturnos do treinamento/previsao.
 }
+\keyword{internal}

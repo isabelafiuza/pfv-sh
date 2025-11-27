@@ -2,16 +2,30 @@
 % Please edit documentation in R/utils.r
 \name{interpola_previsao_nwp}
 \alias{interpola_previsao_nwp}
-\title{Interpola Dados De Previsao NWP}
+\title{Interpola Previsoes NWP para Resolucao Semi-horaria}
 \usage{
 interpola_previsao_nwp(dt_prev)
 }
 \arguments{
-\item{dt_prev}{´data.table´ com os dados de previsao NWP a serem interpolados}
+\item{dt_prev}{data.table com previsoes NWP}
 }
 \value{
-´data.table´ com dados previstos interpolados
+data.table com dados interpolados em intervalos de 30 minutos
 }
 \description{
-Realiza interpolação dos dados previstos dos modelos NWP em intervalos semi-horarios
+Converte dados NWP de resolucao horaria (ou outra) para resolucao
+semi-horaria (30 minutos) usando interpolacao linear.
 }
+\details{
+A funcao:
+\enumerate{
+\item Cria sequencia completa de timestamps em intervalos de 30 min
+\item Faz merge com dados originais
+\item Aplica interpolacao linear nos valores faltantes
+\item Propaga colunas auxiliares via LOCF (last observation carried forward)
+}
+}
+\seealso{
+\code{\link{cria_sequencia_datas}}, \code{\link{interpola_serie_temporal}}
+}
+\keyword{internal}

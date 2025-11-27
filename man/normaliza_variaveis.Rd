@@ -2,21 +2,32 @@
 % Please edit documentation in R/train.r
 \name{normaliza_variaveis}
 \alias{normaliza_variaveis}
-\title{Normaliza variaveis de entrada}
+\title{Normaliza Variaveis (Z-Score)}
 \usage{
 normaliza_variaveis(dt)
 }
 \arguments{
-\item{dt}{\code{data.table} com data_hora, geracao, irradiancia,
-temperatura e umidade do periodo de treinamento selecionado}
+\item{dt}{data.table com variaveis a normalizar}
 }
 \value{
-lista com:
-\itemize{
-\item \code{dados} - data.table com variaveis normalizadas
-\item \code{stats} - medias e desvios padroes de cada variavel
+Lista contendo:
+\describe{
+\item{dados}{data.table com colunas normalizadas (sufixo \code{_norm})}
+\item{stats}{data.table com estatisticas: variavel, med, sd}
 }
 }
 \description{
-Normaliza variaveis de entrada
+Aplica normalizacao z-score a todas as variaveis numericas,
+exceto \code{data_hora}.
 }
+\details{
+A normalizacao z-score transforma cada variavel X em:
+\deqn{X_{norm} = (X - \bar{X}) / \sigma_X}
+
+As estatisticas sao preservadas para posterior desnormalizacao
+das previsoes.
+}
+\seealso{
+\code{\link{desnormaliza_variaveis}}
+}
+\keyword{internal}

@@ -2,21 +2,27 @@
 % Please edit documentation in R/train.r
 \name{cria_dt_auxiliar}
 \alias{cria_dt_auxiliar}
-\title{Cria Data.table Auxiliar}
+\title{Cria data.table Auxiliar para Datas Ausentes}
 \usage{
 cria_dt_auxiliar(dif, dt_completo)
 }
 \arguments{
-\item{dif}{´data.table´ contendo a data ausente nos dados de previsao numerica para a qual se deseja
-criar o data.table de previsoes NA. Contem tambem as demais informacoes necessaria para criar o}
+\item{dif}{data.table com uma linha contendo:
+\describe{
+\item{id_modelo_nwp}{Modelo NWP}
+\item{id_usina}{Usina}
+\item{data_hora_rodada}{Data da rodada ausente}
+\item{passos_inicio}{Offset inicial das previsoes}
+\item{passos_fim}{Offset final das previsoes}
+}}
 
-\item{dt_completo}{´data.table´ completo com as previsoes meteorologicas para referencia}
+\item{dt_completo}{data.table de referencia para obter latitude/longitude}
 }
 \value{
-´data.table´ nor formato adequado para inclusao nos dados de previsao meteorologica a ser usado
+data.table com estrutura identica as previsoes, valores = NA
 }
 \description{
-Auxiliar da funcao ´preenche_ausencia_previsao´. Cria um ´data.table´ auxiliar
-com as datas ausentes nos dados originais de previsao meteorologica. As previsoes meteorologicas
-para essas datas sao preenchidas com ´NA´.
+Funcao auxiliar de \code{preenche_ausencia_previsao} que gera um data.table
+com previsoes NA para uma data de rodada ausente.
 }
+\keyword{internal}

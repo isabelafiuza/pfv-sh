@@ -2,21 +2,26 @@
 % Please edit documentation in R/train.r
 \name{seleciona_janela}
 \alias{seleciona_janela}
-\title{Seleciona janela dos dados para treinamento}
+\title{Seleciona Janela Temporal de Treinamento}
 \usage{
 seleciona_janela(dt, data_ref, janela_dias_treinamento)
 }
 \arguments{
-\item{dt}{\code{data.table} com data_hora, geracao, variaveis meteorologicas}
+\item{dt}{data.table com coluna \code{data_hora}}
 
-\item{data_ref}{data de referencia para selecao da janela}
+\item{data_ref}{Data de referencia (limite superior exclusivo)}
 
-\item{janela_dias_treinamento}{numero de dias utilizados
-para treinamento}
+\item{janela_dias_treinamento}{Numero de dias a incluir na janela}
 }
 \value{
-subset do data.table filtrado
+data.table filtrado com dados da janela especificada
 }
 \description{
-Seleciona janela dos dados para treinamento
+Filtra dados para incluir apenas as N ultimas datas antes da data de referencia.
 }
+\details{
+Seleciona as \code{janela_dias_treinamento} datas mais recentes
+anteriores a \code{data_ref}. Util para definir conjunto de treinamento
+em validacao temporal.
+}
+\keyword{internal}

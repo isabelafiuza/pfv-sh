@@ -7,11 +7,19 @@
 interpola_serie_temporal(dt)
 }
 \arguments{
-\item{dt}{vetor numerico ou objeto a ser interpolado}
+\item{dt}{Vetor numerico a ser interpolado}
 }
 \value{
-vetor com valores interpolados
+Vetor numerico com valores interpolados (NA nas extremidades sao mantidos)
 }
 \description{
-Identifica as lacunas da serie temporal e preenche realizando interpolacao linear
+Aplica interpolacao linear para preencher valores NA em uma serie temporal.
 }
+\details{
+Usa \code{zoo::na.approx} com \code{na.rm = FALSE}, mantendo NAs
+no inicio e fim da serie que nao podem ser interpolados.
+}
+\seealso{
+\code{\link[zoo]{na.approx}}
+}
+\keyword{internal}

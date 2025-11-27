@@ -2,42 +2,42 @@
 % Please edit documentation in R/utils.r
 \name{filtra_dado_por_combinacao}
 \alias{filtra_dado_por_combinacao}
-\title{Filtra data.table com informacao meteorologica e com geracao
-para ajuste do modelo de interesse (nwp x passo de previsao x meia-hora)
-e une ambos os data.tables em um unico}
+\title{Filtra Dados por Combinacao de Parametros}
 \usage{
 filtra_dado_por_combinacao(elem_comb, prev_met_usi, ger_usi)
 }
 \arguments{
-\item{elem_comb}{\code{list} em que cada elemento contem:
-\itemize{
-\item id_modelo_nwp
-\item horiz_prev
-\item hora_min
+\item{elem_comb}{Lista com combinacao de parametros:
+\describe{
+\item{id_modelo_nwp}{Modelo NWP}
+\item{horiz_prev}{Horizonte de previsao (e.g., "D+0")}
+\item{hora_min}{Meia-hora no formato "HH:MM"}
 }}
 
-\item{prev_met_usi}{\code{list} contendo data.tables pelo menos com as colunas:
-\itemize{
-\item id_modelo_nwp - modelo meteorologico
-\item data_hora_previsao - data referencia da previsao
-\item horiz_prev - passo de previsao
-\item hora_min - data_hora em formato HH:MM
-\item valor - variavel meteorologica prevista
-}}
+\item{prev_met_usi}{Lista de data.tables com previsoes meteorologicas,
+cada uma contendo: id_modelo_nwp, passo_prev, hora_min, data_hora_previsao, valor}
 
-\item{ger_usi}{\code{data.table} pelo menos com as colunas:
-\itemize{
-\item data_hora_observacao - data referencia da observacao
-\item hora_min - data_hora em formato HH:MM
-\item valor - geracao observada
-}}
+\item{ger_usi}{data.table com geracao observada contendo:
+data_hora_observacao, hora_min, valor}
 }
 \value{
-\code{data.table} com os dados filtrados para treinamento
+data.table com colunas:
+\describe{
+\item{data_hora}{Timestamp unificado}
+\item{irrad_prev}{Irradiancia prevista (e outras variaveis meteorologicas)}
+\item{valor}{Geracao observada}
+}
 }
 \description{
-Para cada trio modelo meteorologico x passo de previsao x meias-horas,
-e filtrado o conjunto de dados de interesse do data.table original com
-as previsoes e com a geracao. Realiza ainda a juncao em um unico data.table
-com os dados para treinamento
+Filtra e une dados de geracao e previsoes meteorologicas para uma
+combinacao especifica de NWP, horizonte e meia-hora.
 }
+\details{
+A funcao:
+\enumerate{
+\item Filtra dados pela combinacao especificada
+\item Pivota variaveis meteorologicas para formato wide
+\item Une com geracao observada por timestamp
+}
+}
+\keyword{internal}

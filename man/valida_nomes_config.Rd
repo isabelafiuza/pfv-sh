@@ -2,16 +2,17 @@
 % Please edit documentation in R/config-file.r
 \name{valida_nomes_config}
 \alias{valida_nomes_config}
-\title{Valida Chaves Do Arquivo De Configuracao}
+\title{Valida Chaves do Arquivo de Configuracao}
 \usage{
 valida_nomes_config(config)
 }
 \arguments{
-\item{config}{lista de configuracoes}
+\item{config}{Lista de configuracoes}
 }
 \value{
-NULL se config possui todas as chaves; levanta erro do contrario
+\code{NULL} invisivel se valido; gera erro se chaves faltantes
 }
 \description{
-Checa se um arquivo de configuracao lido possui todas as chaves necessarias
+Verifica se todas as chaves obrigatorias estao presentes.
 }
+\keyword{internal}

@@ -2,19 +2,28 @@
 % Please edit documentation in R/predict.r
 \name{recalibra_arimax}
 \alias{recalibra_arimax}
-\title{Recalibra modelo ARIMAX com variaveis exogenas}
+\title{Recalibra Modelo ARIMAX}
 \usage{
 recalibra_arimax(dt, nlmod0)
 }
 \arguments{
-\item{dt}{data.table com variavel \code{ger_obs_norm}, \code{irrad_prev_norm},
-\code{temp_prev_norm} e \code{umid_prev_norm}.}
+\item{dt}{data.table com colunas \code{ger_obs_norm} e variaveis exogenas
+normalizadas (sufixo \code{_norm})}
 
-\item{nlmod0}{modelo ajustado pela etapa de treinamento.}
+\item{nlmod0}{Modelo ARIMAX original da etapa de treinamento}
 }
 \value{
-modelo recalibrado do tipo \code{Arimax}.
+Objeto Arima recalibrado com variaveis exogenas
 }
 \description{
-Recalibra modelo ARIMAX com variaveis exogenas
+Reajusta modelo ARIMAX mantendo a estrutura mas atualizando
+os coeficientes com dados mais recentes.
 }
+\details{
+Filtra registros completos (sem NA em nenhuma variavel) antes
+de recalibrar o modelo.
+}
+\seealso{
+\code{\link[forecast]{Arima}}
+}
+\keyword{internal}

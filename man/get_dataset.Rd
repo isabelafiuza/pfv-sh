@@ -2,18 +2,28 @@
 % Please edit documentation in R/train.r
 \name{get_dataset}
 \alias{get_dataset}
-\title{Cria Dataset Dos Dados Para Treino dos Modelos}
+\title{Cria Dataset para Treinamento}
 \usage{
 get_dataset(args, conn)
 }
 \arguments{
-\item{args}{Lista de argumentos necessarios para criacao dos datasets}
+\item{args}{Lista de argumentos contendo:
+\describe{
+\item{ids_usinas}{Vetor de IDs das usinas}
+\item{modelos_NWP}{Vetor de modelos NWP a carregar}
+}}
 
-\item{conn}{Objeto de conexao com banco de dados}
+\item{conn}{Objeto de conexao com banco de dados (via pfvIO)}
 }
 \value{
-lista contendo o dataset
+Lista nomeada contendo:
+\describe{
+\item{ger_obs}{data.table com geracao observada}
+\item{irrad_prev}{data.table com irradiancia prevista}
+}
 }
 \description{
-Cria dataset dos dados usados no treinamento dos modelos de previsao de acordo configuracao especificada
+Carrega e organiza os dados necessarios para treinamento dos modelos,
+incluindo geracao observada e previsoes meteorologicas.
 }
+\keyword{internal}

@@ -2,24 +2,44 @@
 % Please edit documentation in R/utils.r
 \name{associa_nwp_usina}
 \alias{associa_nwp_usina}
-\title{Associa Usina A Quadricula da NWP}
+\title{Associa Usinas as Quadriculas NWP}
 \usage{
 associa_nwp_usina(dt_prev, dt_usinas)
 }
 \arguments{
-\item{dt_prev}{´data.table´ contendo os dados das variaveis previstas do modelo NWP}
+\item{dt_prev}{data.table com previsoes NWP contendo:
+\describe{
+\item{id_modelo_nwp}{Identificador do modelo NWP}
+\item{latitude}{Latitude do ponto de grade}
+\item{longitude}{Longitude do ponto de grade}
+\item{data_hora_rodada}{Data/hora da rodada}
+\item{data_hora_previsao}{Data/hora da previsao}
+\item{valor}{Valor previsto}
+}}
 
-\item{dt_usinas}{´data.table´ contendo os dados cadastrais das usinas}
+\item{dt_usinas}{data.table com cadastro de usinas contendo:
+\describe{
+\item{id_usina}{Identificador da usina}
+\item{latitude}{Latitude da usina}
+\item{longitude}{Longitude da usina}
+}}
 }
 \value{
-´data.table´ das usinas simuladas e as respectivas variaveis previstas do modelo NWP
-
-OBSERVACAO ISABELA: Funcao aproveitada do MH,
-troquei o nome do argumento dt_irrad_prev para dt_prev
-para deixar generico
+data.table com previsoes associadas as usinas, incluindo
+coluna \code{id_usina}
 }
 \description{
-Obtem as previsoes dos modelos NWP para as usinas simuladas. Para isso, realiza a associacao das coordenadas das
-usinas com quadricula correspondente do modelo NWP.
-E escolhida a quadricula que apresenta menor distancia euclidiana entre seu centroide e a coordenada da usina.
+Mapeia cada usina para a quadricula mais proxima do modelo NWP,
+usando distancia euclidiana entre coordenadas.
 }
+\details{
+Para cada usina, a funcao:
+\enumerate{
+\item Calcula distancia euclidiana para todos os pontos de grade
+\item Seleciona o ponto mais proximo por modelo NWP
+\item Atribui previsoes desse ponto a usina
+}
+
+A coluna \code{id_usina} e posicionada como segunda coluna no resultado.
+}
+\keyword{internal}

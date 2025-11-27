@@ -2,19 +2,34 @@
 % Please edit documentation in R/train.r
 \name{preenche_ausencia_previsao}
 \alias{preenche_ausencia_previsao}
-\title{Preenche Lacunas de Previsao}
+\title{Preenche Lacunas de Rodadas NWP}
 \usage{
 preenche_ausencia_previsao(dt)
 }
 \arguments{
-\item{dt}{'data.table' contendo as previsoes meteorologicas}
+\item{dt}{data.table contendo previsoes meteorologicas com colunas:
+\describe{
+\item{id_modelo_nwp}{Identificador do modelo NWP}
+\item{id_usina}{Identificador da usina}
+\item{data_hora_rodada}{Data/hora da rodada do modelo}
+\item{data_hora_previsao}{Data/hora da previsao}
+\item{valor}{Valor previsto}
+}}
 }
 \value{
-'data.table' contendo as previsoes com datas de execucao do modelo meteorologico completas
+data.table com datas de rodada completas (lacunas preenchidas com NA)
 }
 \description{
-Identifica dias em que nao ha rodada do modelo meteorologico na base de dados e preenche as previsoes
-referentes a essa execucao ausente com NA.
-A funcao avalia a coluna 'data_hora_rodada' de cada modelo meteorologico e, sendo verificada a
-ausencia de alguma data, inclui dados NA para compatibilizacao das series temporais.
+Identifica datas em que nao ha rodada do modelo NWP e preenche
+as previsoes ausentes com NA para manter series temporais completas.
 }
+\details{
+A funcao:
+\enumerate{
+\item Identifica sequencia completa de datas entre min e max data_hora_rodada
+\item Detecta datas ausentes por modelo NWP e usina
+\item Gera registros com valor NA para datas faltantes
+\item Mantem estrutura temporal semi-horaria
+}
+}
+\keyword{internal}
