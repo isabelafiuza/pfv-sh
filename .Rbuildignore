@@ -1,0 +1,16 @@
+^renv$
+^renv\.lock$
+^\.vscode$
+^.lintr$
+^LICENSE\.md$
+^README\.Rmd$
+^main.r$
+^data$
+^docs$
+^saida$
+^Dockerfile$
+^\.dockerignore$
+^DOC-DIRECTIVES\.md$
+^NT_PFV\.pdf$
+^auxiliar$
+^out$
