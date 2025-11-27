@@ -10,21 +10,20 @@
 #'
 #' @return Vetor de classe `Date` contendo as datas alvo de previsao.
 #' @examples
-#' gera_datas_alvo("2025-11-07", c("D+0", "D+1"))
+#' define_hor_prev("2025-11-07", c("D+0", "D+1"))
 #' # Retorna: 2025-11-07, 2025-11-08
 #'
 #' @export
 define_hor_prev <- function(data_referencia, v_horizonte) {
-  
-  data_ref <- as.Date(data_referencia)
+    data_ref <- as.Date(data_referencia)
 
-  datas_alvo <- seq.Date(
-    from = data_ref,
-    by = "day",
-    length.out = length(v_horizonte)
-  )
+    datas_alvo <- seq.Date(
+        from = data_ref,
+        by = "day",
+        length.out = length(v_horizonte)
+    )
 
-  return(datas_alvo)
+    return(datas_alvo)
 }
 
 #' Associa Usina A Quadricula da NWP
@@ -32,13 +31,15 @@ define_hor_prev <- function(data_referencia, v_horizonte) {
 #' Obtem as previsoes dos modelos NWP para as usinas simuladas. Para isso, realiza a associacao das coordenadas das
 #' usinas com quadricula correspondente do modelo NWP.
 #' E escolhida a quadricula que apresenta menor distancia euclidiana entre seu centroide e a coordenada da usina.
-#' 
+#'
 #' @param dt_prev ´data.table´ contendo os dados das variaveis previstas do modelo NWP
 #' @param dt_usinas ´data.table´ contendo os dados cadastrais das usinas
 #'
 #' @return ´data.table´ das usinas simuladas e as respectivas variaveis previstas do modelo NWP
 #'
-#' OBSERVACAO ISABELA: Funcao aproveitada do MH, troquei o nome do argumento dt_irrad_prev para dt_prev para deixar generico
+#' OBSERVACAO ISABELA: Funcao aproveitada do MH,
+#' troquei o nome do argumento dt_irrad_prev para dt_prev
+#' para deixar generico
 
 # Função usando distância euclidiana
 associa_nwp_usina <- function(dt_prev, dt_usinas) {
@@ -59,7 +60,12 @@ associa_nwp_usina <- function(dt_prev, dt_usinas) {
         coord_mais_proxima <- coord_prev[coord_prev[, .I[which.min(distancia)], by = "id_modelo_nwp"]$V1]
 
         # Filtra os dados da previsão para essa coordenada
-        dt_filt <- dt_prev[dt_prev[, .I[which(latitude == coord_mais_proxima$latitude & longitude == coord_mais_proxima$longitude)], by = "id_modelo_nwp"]$V1]
+        dt_filt <- dt_prev[
+            dt_prev[,
+                .I[which(latitude == coord_mais_proxima$latitude & longitude == coord_mais_proxima$longitude)],
+                by = "id_modelo_nwp"
+            ]$V1
+        ]
 
         # Adiciona o id_usina
         dt_filt[, id_usina := usina$id_usina]
@@ -86,12 +92,9 @@ associa_nwp_usina <- function(dt_prev, dt_usinas) {
 #' usinas com quadricula correspondente do modelo NWP.
 #' E escolhida a quadricula que apresenta menor distancia euclidiana entre seu centroide e a coordenada da usina.
 #'
-#' @param dt_usinas ´data.table´ contendo os dados cadastrais das usinas
 #' @param dt_prev ´data.table´ contendo os dados das variaveis previstas do modelo NWP
 #'
 #' @return ´data.table´ das usinas simuladas e as respectivas variaveis previstas do modelo NWP
-#'
-#' OBSERVACAO ISABELA: Funcao aproveitada do MH, troquei o nome do argumento dt_irrad_prev para dt_prev para deixar generico
 #'
 adicionar_passo_previsao <- function(dt_prev) {
     # Garante que as colunas são do tipo POSIXct
@@ -118,7 +121,12 @@ adicionar_passo_previsao <- function(dt_prev) {
 interpola_previsao_nwp <- function(dt_prev) {
     colorder <- names(dt_prev)
     data_hora_interpolacao <- cria_sequencia_datas(dt = dt_prev, discretizacao = "30 min")
-    data_set_discretizacao <- merge(data_hora_interpolacao, dt_prev, by = c("data_hora_rodada", "data_hora_previsao", "id_modelo_nwp", "id_usina"), all.x = TRUE)
+    data_set_discretizacao <- merge(
+        data_hora_interpolacao,
+        dt_prev,
+        by = c("data_hora_rodada", "data_hora_previsao", "id_modelo_nwp", "id_usina"),
+        all.x = TRUE
+    )
     data_set_discretizacao[, valor := interpola_serie_temporal(valor),
         by = .(id_modelo_nwp, id_usina, data_hora_rodada)
     ]
@@ -141,11 +149,19 @@ interpola_previsao_nwp <- function(dt_prev) {
 #'
 #' Identifica as datas de inicio e fim das series temporais
 #' e cria dt com a sequencia completa de datas
+#'
+#' @param dt data.table com dados de previsao
+#' @param discretizacao intervalo de tempo entre datas, ex: "30 min"
+#'
+#' @return data.table com sequencia completa de datas
 cria_sequencia_datas <- function(dt, discretizacao) {
     dt_data_inicio <- dt[, .(data_inicio = min(data_hora_previsao)), by = .(id_modelo_nwp, id_usina, data_hora_rodada)]
     dt_data_fim <- dt[, .(data_fim = max(data_hora_previsao)), by = .(id_modelo_nwp, id_usina, data_hora_rodada)]
     dt_datas_inicio_fim <- merge(dt_data_inicio, dt_data_fim, by = c("id_modelo_nwp", "id_usina", "data_hora_rodada"))
-    dt_sequencia_datas <- dt_datas_inicio_fim[, .(data_hora_previsao = seq(data_inicio, data_fim, by = discretizacao)), by = .(id_modelo_nwp, id_usina, data_hora_rodada)]
+    dt_sequencia_datas <- dt_datas_inicio_fim[,
+        .(data_hora_previsao = seq(data_inicio, data_fim, by = discretizacao)),
+        by = .(id_modelo_nwp, id_usina, data_hora_rodada)
+    ]
 
     return(dt_sequencia_datas)
 }
@@ -153,6 +169,10 @@ cria_sequencia_datas <- function(dt, discretizacao) {
 #' Interpola Serie Temporal
 #'
 #' Identifica as lacunas da serie temporal e preenche realizando interpolacao linear
+#'
+#' @param dt vetor numerico ou objeto a ser interpolado
+#'
+#' @return vetor com valores interpolados
 interpola_serie_temporal <- function(dt) {
     dt_interpolado <- na.approx(dt, na.rm = FALSE)
     return(dt_interpolado)
@@ -167,20 +187,18 @@ interpola_serie_temporal <- function(dt) {
 #' e previsao de geracao solar
 #'
 #' @param dad_usina data.table contendo pelo menos:
-#' \itemize {
+#' \itemize{
 #' \item id_usina
 #' \item potencia instalada
 #' }
-#' @param ger_usina data.table contendo pelo menos:
-#' \itemize {
+#' @param ger_usi data.table contendo pelo menos:
+#' \itemize{
 #' \item data_hora_observacao
 #' \item valor
 #' }
 #' @param fator_tol_ger
 #' fator minimo da capacidade instalada da usina para considerar
 #' que houve geracao
-#' @param janela_dias
-#' numero de dias passados a considerar na analise
 #' @param fator_tol_horas
 #' fator minimo dos dias analisados com geracao
 #'
@@ -189,7 +207,7 @@ interpola_serie_temporal <- function(dt) {
 #'
 #' @details
 #' A funcao segue as etapas:
-#' \itemize {
+#' \itemize{
 #'   \item extrai a meia-hora, hora_min, de cada observacao
 #'   \item seleciona os dias para analise
 #'   \item para cada meia-hora, conta o numero de dias com geracao superior ao limiar estabelecido
@@ -231,19 +249,22 @@ identifica_periodo_ger <- function(dad_usina, ger_usi, fator_tol_ger, fator_tol_
 #' @param v_modelos_nwp vetor com os nomes dos modelos meteorologicos, ex: c("GFS")
 #' @param v_horizonte vetor de caracteres com os passos de previsao, ex: c("D+0", "D+1")
 #' @param periodo_ger vetor de horarios no formato HH:MM, ex: c("12:00", "12:30")
+#' @param v_modelos_previsao vetor com os modelos de previsao
 #'
 #' @return lista com as colunas:
-#' \itemize {
+#' \itemize{
 #' \item id_modelo_nwp - modelo meteorologico
 #' \item horiz_prev - passo de previsao
 #' \item periodo_ger - meias-horas com geracao solar
 #' }
 #'
 #' @examples
+#' \dontrun{
 #' v_nwp <- c("GFS", "ECMWF")
 #' v_horiz <- c("D+0", "D+1")
 #' v_hor_ger <- c("12:00", "12:30")
-#' gera_combinacoes_modelo(v_nwp, v_horiz, v_hor_ger)
+#' gera_combinacoes_modelo(v_nwp, v_horiz, v_hor_ger, "arimax")
+#' }
 gera_combinacoes_modelo <- function(v_modelos_nwp, v_horizonte, periodo_ger, v_modelos_previsao) {
     comb <- CJ(
         id_modelo_nwp = unlist(v_modelos_nwp),
@@ -268,8 +289,15 @@ gera_combinacoes_modelo <- function(v_modelos_nwp, v_horizonte, periodo_ger, v_m
 #' as previsoes e com a geracao. Realiza ainda a juncao em um unico data.table
 #' com os dados para treinamento
 #'
+#' @param elem_comb `list` em que cada elemento contem:
+#' \itemize{
+#'   \item id_modelo_nwp
+#'   \item horiz_prev
+#'   \item hora_min
+#' }
+#'
 #' @param prev_met_usi `list` contendo data.tables pelo menos com as colunas:
-#' \itemize {
+#' \itemize{
 #'  \item id_modelo_nwp - modelo meteorologico
 #'  \item data_hora_previsao - data referencia da previsao
 #'  \item horiz_prev - passo de previsao
@@ -278,17 +306,10 @@ gera_combinacoes_modelo <- function(v_modelos_nwp, v_horizonte, periodo_ger, v_m
 #' }
 #'
 #' @param ger_usi `data.table` pelo menos com as colunas:
-#' \itemize {
+#' \itemize{
 #'  \item data_hora_observacao - data referencia da observacao
 #'  \item hora_min - data_hora em formato HH:MM
 #'  \item valor - geracao observada
-#' }
-#'
-#' @param elem_comb `list` em que cada elemento contem:
-#' \itemize {
-#'   \item id_modelo_nwp
-#'   \item horiz_prev
-#'   \item hora_min
 #' }
 #'
 #' @return `data.table` com os dados filtrados para treinamento
@@ -348,7 +369,7 @@ filtra_dado_por_combinacao <- function(elem_comb, prev_met_usi, ger_usi) {
 #' e data_hora_previsao
 #'
 #' @param prev_usina_elem `list` contendo listas pelo menos com os elementos:
-#' \itemize {
+#' \itemize{
 #'  \item combinacao_ajuste - conjunto de parametros que definem a previsao,
 #'  incluindo id_modelo_nwp, horiz_prev, hora_min, modelo_prev
 #'  \item prev - valor previsto
@@ -361,14 +382,13 @@ filtra_dado_por_combinacao <- function(elem_comb, prev_met_usi, ger_usi) {
 #' @return `data.table` com os dados previstos para a usina
 
 monta_dt_prev <- function(prev_usina_elem, id_usina, data_referencia) {
-
     data_hora_rodada <- as.POSIXct(data_referencia, tz = "UTC")
 
     # dados da combinação
-    id_modelo_prev  <- prev_usina_elem$combinacao_ajuste$modelo_prev
-    id_modelo_nwp   <- prev_usina_elem$combinacao_ajuste$id_modelo_nwp
-    horiz_prev      <- prev_usina_elem$combinacao_ajuste$horiz_prev   
-    hora_min        <- prev_usina_elem$combinacao_ajuste$hora_min     
+    id_modelo_prev <- prev_usina_elem$combinacao_ajuste$modelo_prev
+    id_modelo_nwp <- prev_usina_elem$combinacao_ajuste$id_modelo_nwp
+    horiz_prev <- prev_usina_elem$combinacao_ajuste$horiz_prev
+    hora_min <- prev_usina_elem$combinacao_ajuste$hora_min
 
     # define data_hora_previsao
     dias <- as.integer(sub("D\\+", "", horiz_prev))
@@ -388,5 +408,3 @@ monta_dt_prev <- function(prev_usina_elem, id_usina, data_referencia) {
         valor = valor
     )
 }
-
-

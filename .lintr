@@ -1,0 +1,9 @@
+linters: linters_with_defaults(
+  line_length_linter(120),
+  object_name_linter(c("snake_case", "symbols"), regexes = character()),
+  object_usage_linter = NULL,
+  indentation_linter(4, "never"),
+  return_linter = NULL,
+  cyclocomp_linter(complexity_limit = 12L),
+  object_length_linter(length = 50)
+  )

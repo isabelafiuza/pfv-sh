@@ -5,7 +5,7 @@
 #' @export
 
 get_parser <- function() {
-    parser <- ArgumentParser(description = "Modelo de Consistencia do Melhor Historico de Geracao Solar")
+    parser <- ArgumentParser(description = "Modelo de Previsao de Geracao Solar Fotovoltaica Semihoraria")
 
     parser <- inner_parser_generic_args(parser)
     return(parser)
@@ -16,10 +16,13 @@ get_parser <- function() {
 #' Auxiliar para adicionar argumentos genericos
 #'
 #' Funcao interna, nao deve ser chamada diretamente pelo usuario
-
+#'
+#' @param parser objeto ArgumentParser para adicionar argumentos
+#'
+#' @return parser com argumentos adicionados
 inner_parser_generic_args <- function(parser) {
-    help_msg <- paste0("Diretorio de dados para execucao do melhor historico -- Veja ",
-        "https://github.com/rjmalves/melhor-historico-solar para detalhes")
+    help_msg <- paste0("Diretorio de dados para execucao do modelo de previsao -- Veja ",
+        "https://github.com/isabelafiuza/pfv-sh para detalhes")
     parser$add_argument("--datadir",
         type = "character",
         default = "./data",

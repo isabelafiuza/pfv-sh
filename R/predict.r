@@ -1,4 +1,3 @@
-
 predict_main <- function(args) {
     conn <- conectamock_pfv(args$input)
 
@@ -42,17 +41,20 @@ predict_main <- function(args) {
 
     # define ordem da previsao
     setorder(
-        dt_prev_final,
+        dt_final,
         id_usina,
         id_modelo_prev,
         id_modelo_nwp,
         data_hora_previsao
     )
+
+    return(dt_final)
 }
 
 predict_usina <- function(
     iu, dt_usinas, dt_ger_obs, dt_prev, parametros_modelo_previsao,
-    parametros_periodo_geracao, data_prev) {
+    parametros_periodo_geracao, data_prev
+) {
     # Filtra os dados de geracao e meteorologicos referentes a usina atual
     dad_usi <- dt_usinas[id_usina == iu]
     ger_usi <- dt_ger_obs[id_usina == iu]
@@ -92,9 +94,21 @@ predict_usina <- function(
 
 parse_predict <- function(modelo, ...) UseMethod("parse_predict")
 
-parse_predict.arimax <- function(
-    modelo, pars, data_prev, ger_usi,
-    prev_met_usi, modelo_parametros) {
+#' @export
+parse_predict.default <- function(modelo, ...) {
+    stop("Unknown model type for parse_predict")
+}
+
+#' @export
+parse_predict.arimax <- function(modelo, ...) {
+    args <- list(...)
+    pars <- args$pars
+    data_prev <- args$data_prev
+    ger_usi <- args$ger_usi
+    prev_met_usi <- args$prev_met_usi
+    modelo_parametros <- args$modelo_parametros
+    v_horizonte <- args$v_horizonte
+
     dt_filt <- filtra_dado_por_combinacao(pars, prev_met_usi, ger_usi)
 
     # FUNCAO QUE CHECA OS DADOS DEVE FAZER ISSO
@@ -108,7 +122,10 @@ parse_predict.arimax <- function(
     setnames(dt_prev_filt, "valor", "ger_obs")
 
     # seleciona janela dos dados para treinamento
-    dt_treino_filt <- seleciona_janela(dt_treino_filt, data_prev, janela_dias_treinamento = modelo_parametros$n_dias_treino)
+    dt_treino_filt <- seleciona_janela(dt_treino_filt,
+        data_prev,
+        janela_dias_treinamento = modelo_parametros$n_dias_treino
+    )
     setnames(dt_treino_filt, "valor", "ger_obs")
 
     # avalia numero de conjuntos ger x irr x temp x umid
@@ -160,7 +177,16 @@ parse_predict.arimax <- function(
     }
 }
 
-parse_predict.fisico_estimado <- function(modelo_parametros, mod_aju_comb, pars){
+#' @export
+parse_predict.fisico_estimado <- function(modelo, ...) {
+    args <- list(...)
+    pars <- args$pars
+    prev_met_usi <- args$prev_met_usi
+    ger_usi <- args$ger_usi
+    v_horizonte <- args$v_horizonte
+    data_prev <- args$data_prev
+    mod_aju_comb <- modelo
+
     dt_filt <- filtra_dado_por_combinacao(pars, prev_met_usi, ger_usi)
 
     # separa as variaveis meteorologicas previstas para aplicacao no modelo
@@ -178,12 +204,12 @@ parse_predict.fisico_estimado <- function(modelo_parametros, mod_aju_comb, pars)
     dt_prev <- predict(nlmod, variaveis_previstas, interval = "prediction")
     dt_prev_out <- dt_prev$fit
 
-    return(dt_prev_out)    
+    return(dt_prev_out)
 }
 
 # AUXILIARES ---------------------------------------------------------------------------------------
 
-carrega_modelo_RDS <- function(modelo_previsao, id_usina, diretorio){
+carrega_modelo_rds <- function(modelo_previsao, id_usina, diretorio) {
     mod_aju <- readRDS(paste(diretorio, paste0(id_usina, "_", modelo_previsao, "_ajustado.rds"), sep = "/"))
     return(mod_aju)
 }
@@ -226,8 +252,6 @@ recalibra_arimax <- function(dt, nlmod0) {
 #' @param stats_norm data.table com colunas: variavel, med, sd
 #'
 #' @return data.table com colunas desnormalizadas (sem sufixo "_norm")
-#' @examples
-#' dt_real <- desnormaliza_variaveis(dt_norm, stats_norm)
 desnormaliza_variaveis <- function(dt, stats_norm) {
     dt_out <- copy(dt)
 
