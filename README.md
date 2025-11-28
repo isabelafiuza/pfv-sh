@@ -9,7 +9,7 @@
 
 ## 1. Visão Geral do Projeto
 
-O `pfv-sh` é um pacote R para **previsão de geração solar fotovoltaica** com resolução semi-horária (30 minutos), desenvolvido para suportar a operação do Sistema Interligado Nacional (SIN) brasileiro.
+O `pfv-sh` é um pacote R para **previsão de geração solar fotovoltaica** com resolução semi-horária (30 minutos), desenvolvido para apoiar a programação da operação do Sistema Interligado Nacional (SIN) brasileiro.
 
 ### Funcionalidades Principais
 
@@ -24,7 +24,7 @@ O `pfv-sh` é um pacote R para **previsão de geração solar fotovoltaica** com
 | Aspecto                    | Descrição                                                            |
 | -------------------------- | -------------------------------------------------------------------- |
 | **Cobertura temporal**     | Previsões semi-horárias (48 pontos/dia)                              |
-| **Horizonte**              | D+0 a D+9 (até 10 dias à frente)                                     |
+| **Horizonte**              | D+0 a D+9 (10 dias de previsão)                                     |
 | **Modelos NWP suportados** | GFS, ECMWF (configurável)                                            |
 | **Modelos de previsão**    | ARIMAX, Físico-Estimado (regressão linear)                           |
 | **Limitações conhecidas**  | Requer dados históricos de geração; sensível a lacunas nos dados NWP |
@@ -59,7 +59,8 @@ O `pfv-sh` é um pacote R para **previsão de geração solar fotovoltaica** com
 │  │  • auto.arima()         │    │  • Regressão Linear     │                 │
 │  │  • Variáveis exógenas   │    │    Simples (RLS)        │                 │
 │  │    (irradiância)        │    │  • Regressão Linear     │                 │
-│  │  • Seleção por AICc     │    │    Múltipla (RLM)       │                 │
+│  │  • Seleção por desvio   │    │    Múltipla (RLM)       |                 |
+|  │    in-sample e AICc     |    │                         |                 |
 │  └─────────────────────────┘    └─────────────────────────┘                 │
 │                                                                             │
 │  Treinamento: por usina × modelo NWP × horizonte × meia-hora                │
@@ -280,12 +281,12 @@ GFS,-23.5,-46.5,2024-01-01 00:00:00,2024-01-01 12:00:00,850.5
 
 ## 6. Modelos de Previsão
 
-### 6.1 ARIMAX
+### 6.1 ARIMA/ARIMAX
 
-Modelo auto-regressivo integrado de média móvel com variáveis exógenas:
+Modelo auto-regressivo integrado de média móvel:
 
 - **Variável dependente**: Geração normalizada
-- **Variáveis exógenas**: Irradiância prevista (normalizada)
+- **Variáveis exógenas**: Irradiância prevista normalizada (apenas ARIMAX)
 - **Seleção automática**: `auto.arima()` do pacote `forecast`
 - **Critério de seleção**: AICc + erro médio absoluto
 
