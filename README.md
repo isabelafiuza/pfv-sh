@@ -21,13 +21,13 @@ O `pfv-sh` é um pacote R para **previsão de geração solar fotovoltaica** com
 
 ### Escopo e Limitações
 
-| Aspecto | Descrição |
-|---------|-----------|
-| **Cobertura temporal** | Previsões semi-horárias (48 pontos/dia) |
-| **Horizonte** | D+0 a D+9 (até 10 dias à frente) |
-| **Modelos NWP suportados** | GFS, ECMWF (configurável) |
-| **Modelos de previsão** | ARIMAX, Físico-Estimado (regressão linear) |
-| **Limitações conhecidas** | Requer dados históricos de geração; sensível a lacunas nos dados NWP |
+| Aspecto                    | Descrição                                                            |
+| -------------------------- | -------------------------------------------------------------------- |
+| **Cobertura temporal**     | Previsões semi-horárias (48 pontos/dia)                              |
+| **Horizonte**              | D+0 a D+9 (até 10 dias à frente)                                     |
+| **Modelos NWP suportados** | GFS, ECMWF (configurável)                                            |
+| **Modelos de previsão**    | ARIMAX, Físico-Estimado (regressão linear)                           |
+| **Limitações conhecidas**  | Requer dados históricos de geração; sensível a lacunas nos dados NWP |
 
 ---
 
@@ -141,53 +141,53 @@ O arquivo `config.jsonc` no diretório de dados controla a execução:
 
 ```jsonc
 {
-    // Modo: "train" para treinamento, "predict" para previsão
-    "mode": "train",
-    
-    // Caminhos de entrada/saída
-    "input": "./data",
-    "output": "./out",
-    "artifact": ".",
-    
-    // Usinas (vazio = todas)
-    "ids_usinas": ["BAUFI1"],
-    
-    // Data de referência (YYYY-MM-DD)
-    "data_referencia": "2025-07-02",
-    
-    // Horizontes de previsão
-    "horizonte_dias": ["D+0", "D+1"],
-    
-    // Modelos NWP
-    "modelos_NWP": ["GFS"],
-    
-    // Configuração dos modelos de previsão
-    "modelos_previsao": {
-        "arimax": {
-            "tipo": "arimax",
-            "n_dias_treino": 360,
-            "amos_min": 5
-        },
-        "fisico_estimado": {
-            "tipo": "fisico_estimado",
-            "n_dias_treino": 180,
-            "amos_min": 5
-        }
+  // Modo: "train" para treinamento, "predict" para previsão
+  "mode": "train",
+
+  // Caminhos de entrada/saída
+  "input": "./data",
+  "output": "./out",
+  "artifact": ".",
+
+  // Usinas (vazio = todas)
+  "ids_usinas": ["BAUFI1"],
+
+  // Data de referência (YYYY-MM-DD)
+  "data_referencia": "2025-07-02",
+
+  // Horizontes de previsão
+  "horizonte_dias": ["D+0", "D+1"],
+
+  // Modelos NWP
+  "modelos_NWP": ["GFS"],
+
+  // Configuração dos modelos de previsão
+  "modelos_previsao": {
+    "arimax": {
+      "tipo": "arimax",
+      "n_dias_treino": 360,
+      "amos_min": 5
     },
-    
-    // Parâmetros para identificação de período de geração
-    "parametros_periodo_geracao": {
-        "fator_tolerancia_limite_superior_geracao": 1.1,
-        "fator_tolerancia_limite_inferior_geracao": 0.01,
-        "percentual_dias_geracao": 0.9
+    "fisico_estimado": {
+      "tipo": "fisico_estimado",
+      "n_dias_treino": 180,
+      "amos_min": 5
     }
+  },
+
+  // Parâmetros para identificação de período de geração
+  "parametros_periodo_geracao": {
+    "fator_tolerancia_limite_superior_geracao": 1.1,
+    "fator_tolerancia_limite_inferior_geracao": 0.01,
+    "percentual_dias_geracao": 0.9
+  }
 }
 ```
 
 ### 4.3 Uso Programático em R
 
 ```r
-library(pfv.sh)
+library(pfvsh)
 library(pfvIO)
 
 # Conectar ao mock de dados
@@ -215,19 +215,21 @@ if (config$mode == "predict") {
 
 ### 5.1 Dados de Entrada
 
-| Arquivo | Descrição | Colunas Principais |
-|---------|-----------|-------------------|
-| `usinas.csv` | Cadastro das usinas | `id_usina`, `latitude`, `longitude`, `capacidade_instalada_MW` |
-| `geracao_observada.csv` | Geração histórica | `id_usina`, `data_hora_observacao`, `valor` |
-| `irradiancia_prevista.csv` | Previsões NWP | `id_modelo_nwp`, `latitude`, `longitude`, `data_hora_rodada`, `data_hora_previsao`, `valor` |
-| `config.jsonc` | Configuração | Ver seção 4.2 |
+| Arquivo                    | Descrição           | Colunas Principais                                                                          |
+| -------------------------- | ------------------- | ------------------------------------------------------------------------------------------- |
+| `usinas.csv`               | Cadastro das usinas | `id_usina`, `latitude`, `longitude`, `capacidade_instalada_MW`                              |
+| `geracao_observada.csv`    | Geração histórica   | `id_usina`, `data_hora_observacao`, `valor`                                                 |
+| `irradiancia_prevista.csv` | Previsões NWP       | `id_modelo_nwp`, `latitude`, `longitude`, `data_hora_rodada`, `data_hora_previsao`, `valor` |
+| `config.jsonc`             | Configuração        | Ver seção 4.2                                                                               |
 
 ### 5.2 Dados de Saída
 
 **Modo Train:**
+
 - `{id_usina}_modelos_ajustados.rds`: Artefatos dos modelos treinados
 
 **Modo Predict:**
+
 - `data.table` com colunas:
   - `id_modelo_prev`: Tipo do modelo (arimax, fisico_estimado)
   - `id_usina`: Identificador da usina

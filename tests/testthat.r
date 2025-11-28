@@ -7,6 +7,6 @@
 # * https://testthat.r-lib.org/articles/special-files.html
 
 library(testthat)
-library(pfv.sh)
+library(pfvsh)
 
-test_check("pfv.sh")
+test_check("pfvsh")

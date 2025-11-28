@@ -44,7 +44,7 @@ USER appuser
 
 # Health check - verify R and package load correctly
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD Rscript -e "library(pfv.sh); cat('OK')" || exit 1
+    CMD Rscript -e "library(pfvsh); cat('OK')" || exit 1
 
 # Default environment variables
 ENV LOG_LEVEL=info

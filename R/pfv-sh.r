@@ -1,7 +1,7 @@
-#' @title pfv.sh: Previsao de Geracao Solar Fotovoltaica Semi-horaria
+#' @title pfvsh: Previsao de Geracao Solar Fotovoltaica Semi-horaria
 #'
 #' @description
-#' O pacote \code{pfv.sh} fornece funcionalidades para previsao de geracao
+#' O pacote \code{pfvsh} fornece funcionalidades para previsao de geracao
 #' solar fotovoltaica com resolucao semi-horaria (30 minutos), desenvolvido
 #' para suportar a operacao do Sistema Interligado Nacional (SIN) brasileiro.
 #'
@@ -53,11 +53,6 @@
 #'
 #' @author Isabela Fiuza \email{isabela.fiuza@@ons.org.br}
 #'
-#' @seealso
-#' \itemize{
-#'   \item Documentacao tecnica: \code{vignette("NT_PFV", package = "pfv.sh")}
-#'   \item Repositorio: \url{https://github.com/isabelafiuza/pfv-sh}
-#' }
 #'
 #' @import utils stats
 #' @import data.table argparse lgr pfvIO

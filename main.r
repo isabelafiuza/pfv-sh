@@ -1,5 +1,5 @@
 suppressPackageStartupMessages(library(pfvIO))
-suppressPackageStartupMessages(library(pfv.sh))
+suppressPackageStartupMessages(library(pfvsh))
 
 parser <- get_parser()
 args <- parser$parse_args()
