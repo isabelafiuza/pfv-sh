@@ -39,7 +39,7 @@ O `pfv-sh` é um pacote R para **previsão de geração solar fotovoltaica** com
 ├─────────────────┬─────────────────────┬─────────────────────────────────────┤
 │  Geração        │  Irradiância        │  Cadastro de                        │
 │  Observada      │  Prevista (NWP)     │  Usinas                             │
-│  (MW)           │  (W/m²)             │  (lat, lon, cap)                    │
+│  (MW)           │  (W/m²)             │  (lat, lon, cap. instalada)         │
 └────────┬────────┴──────────┬──────────┴──────────────────┬──────────────────┘
          │                   │                             │
          ▼                   ▼                             ▼
@@ -55,12 +55,13 @@ O `pfv-sh` é um pacote R para **previsão de geração solar fotovoltaica** com
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                            MODELAGEM                                        │
 │  ┌─────────────────────────┐    ┌─────────────────────────┐                 │
-│  │       ARIMAX            │    │   Físico-Estimado       │                 │
+│  │       ARIMA/ARIMAX      │    │   Físico-Estimado       │                 │
 │  │  • auto.arima()         │    │  • Regressão Linear     │                 │
 │  │  • Variáveis exógenas   │    │    Simples (RLS)        │                 │
 │  │    (irradiância)        │    │  • Regressão Linear     │                 │
 │  │  • Seleção por desvio   │    │    Múltipla (RLM)       |                 |
-|  │    in-sample e AICc     |    │                         |                 |
+|  │    in-sample e AICc     |    │  • Seleção por desvio   │                 │
+│  │                         │    │    in-sample            │                 │
 │  └─────────────────────────┘    └─────────────────────────┘                 │
 │                                                                             │
 │  Treinamento: por usina × modelo NWP × horizonte × meia-hora                │

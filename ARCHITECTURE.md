@@ -52,7 +52,7 @@ O `pfv-sh` é um pacote R estruturado seguindo os padrões de desenvolvimento de
 │  • adicionar_passo_previsao()         Utilitários:                      │
 │                                       • define_hor_prev()               │
 │  Período de Geração:                  • monta_dt_prev()                 │
-│  • identifica_periodo_ger()           • interpola_serie_temporal()      │
+│  • identifica_periodo_ger()                                             │
 └─────────────────────────────────────────────────────────────────────────┘
                                  │
                                  ▼
@@ -118,7 +118,7 @@ O `pfv-sh` é um pacote R estruturado seguindo os padrões de desenvolvimento de
                     │                     │
                     │  Lista contendo:    │
                     │  • combinacao_ajuste│
-                    │  • modelo lm/Arimax │
+                    │  • modelo RL/Arimax │
                     └─────────────────────┘
 ```
 
