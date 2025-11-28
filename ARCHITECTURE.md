@@ -90,7 +90,9 @@ O `pfv-sh` é um pacote R estruturado seguindo os padrões de desenvolvimento de
                     │  config.jsonc       │
                     │  • mode: "train"    │
                     │  • ids_usinas       │
-                    │  • data_referencia  │
+                    │  • data_referencia  |
+                    |  • horizonte_dias   |
+                    |  • modelos_NWP      |
                     └─────────┬───────────┘
                               │
                               ▼
@@ -101,7 +103,7 @@ O `pfv-sh` é um pacote R estruturado seguindo os padrões de desenvolvimento de
 ┌──────────────┐    │  Para cada usina:   │
 │ irrad_prev.  │──▶│  1. Filtra dados    │
 │    csv       │    │  2. Associa NWP     │
-└──────────────┘    │  3. Interpola       │
+└──────────────┘    │  3. Interpola NWP   │
                     │  4. Identifica      │
                     │     período ger     │
                     │  5. Gera combina-   │
@@ -116,7 +118,7 @@ O `pfv-sh` é um pacote R estruturado seguindo os padrões de desenvolvimento de
                     │                     │
                     │  Lista contendo:    │
                     │  • combinacao_ajuste│
-                    │  • modelo (lm/Arima)│
+                    │  • modelo lm/Arimax │
                     └─────────────────────┘
 ```
 
@@ -133,10 +135,11 @@ O `pfv-sh` é um pacote R estruturado seguindo os padrões de desenvolvimento de
         │      predict_main()         │
         │                             │
         │  Para cada usina:           │
-        │  1. Carrega artefatos       │
-        │  2. Prepara dados NWP       │
-        │  3. Recalibra modelos       │
-        │  4. Gera previsões          │
+        │  1. Define dias de previsão |
+        |  2. Carrega artefatos       │
+        │  3. Prepara dados NWP       │
+        │  4. Recalibra modelo Arimax │
+        │  5. Gera previsões          │
         └─────────────┬───────────────┘
                       │
                       ▼
@@ -176,13 +179,17 @@ O `pfv-sh` é um pacote R estruturado seguindo os padrões de desenvolvimento de
   - `associa_nwp_usina()`: Mapeia grid NWP → usinas
   - `interpola_previsao_nwp()`: Interpolação para 30 min
   - `identifica_periodo_ger()`: Detecta horários com geração solar
+  - `adicionar_passo_previsao()`: Indica passo de previsão D+0 a D+9
+  - `gera_combinacoes_modelo()`: Lista todas as combinacoes de modelos a serem ajustados
+  - `filtra_dado_por_combinacao()`: Filtra dado de uma combinação para treinar modelo/realizar previsão
+  - `monta_dt_prev()`: organiza previsão em formato de data.table
 
 ### 4.4 Camada de Modelagem (train.r, predict.r)
 
 - **Responsabilidade**: Treinamento e previsão
 - **Padrão**: S3 method dispatch por tipo de modelo
 - **Modelos implementados**:
-  - `arimax`: Auto ARIMA com variáveis exógenas
+  - `arimax`: Auto ARIMA sem/com variáveis exógenas
   - `fisico_estimado`: Regressão linear (RLS/RLM)
 
 ### 4.5 Camada de I/O (pfvIO - externo)
@@ -264,10 +271,10 @@ O sistema treina um modelo separado para cada combinação de:
 
 - Usina
 - Modelo NWP
-- Horizonte de previsão (D+0, D+1, ...)
+- Horizonte de previsão (D+0, D+1, ..., D+9)
 - Meia-hora do dia (00:00, 00:30, ..., 23:30)
 
-**Implicação**: Para 1 usina × 1 NWP × 2 horizontes × 48 meias-horas = 96 modelos
+**Implicação**: Por exemplo, para 1 usina × 1 NWP × 2 horizontes × 48 meias-horas = 96 modelos
 
 ### 7.2 Otimizações Implementadas
 
@@ -308,8 +315,7 @@ parse_predict.lstm <- function(modelo, ...) {
 ### 8.2 Adicionar Nova Variável Exógena
 
 1. Atualize `get_dataset()` para carregar a nova variável
-2. Modifique `filtra_dado_por_combinacao()` para incluir a variável
-3. Atualize os modelos de treinamento/previsão
+2. Atualize os modelos de treinamento/previsão
 
 ---
 
