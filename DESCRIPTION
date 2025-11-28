@@ -1,6 +1,6 @@
 Package: pfvsh
 Title: Modelo de previsao de geracao solar fotovoltaica
-Version: 0.0.0.9000
+Version: 0.1.0
 Authors@R: 
     person("Isabela", "Fiuza", , "isabela.fiuza@ons.org.br", role = c("aut", "cre"))
 Description: Este pacote contem as funcionalidades necessarias para criacao de previsoes de geracao 
