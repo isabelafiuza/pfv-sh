@@ -1,0 +1,40 @@
+# Git
+.git
+.gitignore
+
+# R development files
+.Rproj.user
+.Rhistory
+.RData
+*.Rproj
+
+# Documentation source (not needed in image)
+docs/
+*.md
+!README.md
+
+# Tests (not needed in production image)
+tests/
+testthat/
+
+# Development files
+.lintr
+.github/
+DOC-DIRECTIVES.md
+
+# Output directories (will be mounted)
+out/
+artifact/
+
+# IDE
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.log
+*.bak
