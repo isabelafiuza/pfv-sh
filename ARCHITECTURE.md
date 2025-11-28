@@ -244,15 +244,15 @@ Comportamento controlado por arquivo de configuração JSON:
 
 ## 6. Dependências Principais
 
-| Pacote | Propósito |
-|--------|-----------|
-| `data.table` | Manipulação eficiente de dados |
-| `forecast` | Modelos ARIMA/ARIMAX |
-| `zoo` | Interpolação de séries temporais |
-| `lubridate` | Manipulação de datas |
-| `argparse` | Parser de CLI |
-| `lgr` | Logging estruturado |
-| `pfvIO` | I/O de dados PFV (interno) |
+| Pacote       | Propósito                        |
+| ------------ | -------------------------------- |
+| `data.table` | Manipulação eficiente de dados   |
+| `forecast`   | Modelos ARIMA/ARIMAX             |
+| `zoo`        | Interpolação de séries temporais |
+| `lubridate`  | Manipulação de datas             |
+| `argparse`   | Parser de CLI                    |
+| `lgr`        | Logging estruturado              |
+| `pfvIO`      | I/O de dados PFV (interno)       |
 
 ---
 
@@ -261,6 +261,7 @@ Comportamento controlado por arquivo de configuração JSON:
 ### 7.1 Granularidade de Modelos
 
 O sistema treina um modelo separado para cada combinação de:
+
 - Usina
 - Modelo NWP
 - Horizonte de previsão (D+0, D+1, ...)

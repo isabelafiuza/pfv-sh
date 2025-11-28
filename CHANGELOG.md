@@ -1,37 +1,38 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+Todas as mudanças notáveis deste projeto serão documentadas neste arquivo.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
+e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
-## [Unreleased]
+---
 
-### Added
-- Initial package structure with train and predict pipelines
-- ARIMAX model for solar generation forecasting
-- Fisico-Estimado model (linear regression) for solar generation forecasting
-- NWP data preprocessing: grid association, interpolation, gap filling
-- Automatic identification of solar generation periods
-- Configuration file validation and parsing
-- Docker support for containerized execution
-- Comprehensive roxygen2 documentation
-- Unit tests for config and utils modules
-- GitHub workflows for CI/CD (lint, test, R-CMD-check, docker)
-- Issue and PR templates
-
-### Dependencies
-- data.table >= 1.17.0
-- forecast >= 8.24.0
-- zoo >= 1.8-14
-- argparse >= 2.2.5
-- lubridate >= 1.9.4
-- lgr >= 0.4.4
-- pfvIO >= 0.2.2
-
-## [0.0.0.9000] - 2025-11-27
+## [0.1.0] - 2025-11-28
 
 ### Added
-- Initial development version
-- Core forecasting functionality
-- Package scaffolding
+
+- Estrutura inicial de pacote com pipelines de `train` e `predict`
+- Modelos ARIMA e ARIMAX
+- Modelo Fisico-Estimado (regressão linear)
+- Pré-processamento de dados de modelos NWP: associação de quadrícula, preenchimento, etc.
+- Identificação automática de períodos com geração solar
+- Suporte a configuração via arquivo JSONC
+- Logging estruturado com `lgr`
+- Exportação em formato Parquet
+- Dockerfile para containerização
+- Testes unitários com `testthat`
+- Linting com `lintr`
+- Documentação completa do projeto (README, CONTRIBUTING, ARCHITECTURE)
+- GitHub Actions para CI/CD (R-CMD-check, lint, testes)
+- Templates de issues e pull requests
+
+---
+
+## Tipos de Mudanças
+
+- **Added**: para novas funcionalidades
+- **Changed**: para mudanças em funcionalidades existentes
+- **Deprecated**: para funcionalidades que serão removidas em breve
+- **Removed**: para funcionalidades removidas
+- **Fixed**: para correções de bugs
+- **Security**: para correções de vulnerabilidades

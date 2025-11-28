@@ -9,21 +9,24 @@ Obrigado pelo interesse em contribuir com o `pfv-sh`! Este documento fornece dir
 ### 1.1 Pré-requisitos
 
 - R ≥ 4.0
-- RStudio (recomendado) ou outro IDE com suporte a R
+- Visual Studio Code (recomendado) ou outra IDE
 - Git
 
 ### 1.2 Setup Inicial
 
 ```bash
-# Clone o repositório
-git clone https://github.com/isabelafiuza/pfv-sh.git
+# Clone seu fork
+git clone https://github.com/SEU_USUARIO/pfv-sh.git
 cd pfv-sh
 
+# Adicione o upstream
+git remote add upstream https://github.com/isabelafiuza/pfv-sh.git
+
 # Restaure as dependências com renv
-R -e "renv::restore()"
+Rscript -e "renv::restore()"
 
 # Instale dependências de desenvolvimento
-R -e "install.packages(c('devtools', 'testthat', 'lintr', 'styler', 'roxygen2'))"
+Rscript -e "install.packages(c('devtools', 'testthat', 'lintr', 'roxygen2', 'covr', 'cyclocomp'))"
 ```
 
 ### 1.3 Estrutura do Projeto
@@ -43,6 +46,15 @@ pfv-sh/
 ├── main.r                  # Ponto de entrada CLI
 ├── Dockerfile              # Containerização
 └── renv.lock               # Lockfile de dependências
+```
+
+### 1.4 Verificando a Instalação
+
+```r
+# No R
+devtools::load_all()   # Carrega o pacote em desenvolvimento
+devtools::test()       # Executa os testes
+devtools::check()      # Verificação completa
 ```
 
 ---
@@ -79,27 +91,68 @@ A configuração do linter está em `.lintr`.
 
 Seguimos os princípios do [Advanced R](https://adv-r.hadley.nz/):
 
-1. **Funções pequenas e focadas**: Uma função, uma responsabilidade
-2. **Programação funcional**: Prefira `lapply`/`vapply` sobre loops `for`
-3. **Imutabilidade**: Use `copy()` em `data.table` quando necessário
-4. **Tratamento de erros**: Use `tryCatch()` com mensagens informativas
-5. **Validação de entrada**: Sempre valide parâmetros de funções públicas
+#### 1. Funções Puras e Pequenas
 
 ```r
-# Exemplo de função bem estruturada
-#' @title Calcula Erro Médio Absoluto
-#' @param actual Vetor numérico de valores observados
-#' @param predicted Vetor numérico de valores previstos
-#' @return Erro médio absoluto (escalar numérico)
-#' @export
-calculate_mae <- function(actual, predicted) {
+# ✅ Bom: função focada, sem efeitos colaterais
+calcular_mae <- function(observado, previsto) {
     stopifnot(
-        is.numeric(actual),
-        is.numeric(predicted),
-        length(actual) == length(predicted)
+        is.numeric(observado),
+        is.numeric(previsto),
+        length(observado) == length(previsto)
     )
-    
-    mean(abs(actual - predicted), na.rm = TRUE)
+    mean(abs(observado - previsto), na.rm = TRUE)
+}
+
+# ❌ Evitar: funções grandes com múltiplas responsabilidades
+```
+
+#### 2. Validação de Entrada
+
+```r
+# ✅ Bom: validar tipos e dimensões
+processar_dados <- function(dt, coluna) {
+    if (!is.data.table(dt)) {
+        stop("'dt' deve ser um data.table")
+    }
+    if (!coluna %in% names(dt)) {
+        stop(sprintf("Coluna '%s' não encontrada", coluna))
+    }
+    # ...
+}
+```
+
+#### 3. Operações Vetorizadas
+
+```r
+# ✅ Bom: vetorizado
+valores_normalizados <- (valores - min(valores)) / (max(valores) - min(valores))
+
+# ❌ Evitar: loops explícitos quando desnecessários
+for (i in seq_along(valores)) {
+    valores_normalizados[i] <- (valores[i] - min(valores)) / (max(valores) - min(valores))
+}
+```
+
+#### 4. data.table Idiomático
+
+```r
+# ✅ Bom: sintaxe data.table
+dt[, valor_ajustado := valor * fator, by = id_usina]
+dt[is.na(valor), valor := 0]
+
+# ❌ Evitar: misturar com dplyr ou base R desnecessariamente
+```
+
+#### 5. Tratamento de Erros
+
+```r
+# ✅ Bom: mensagens informativas
+if (nrow(dados) == 0) {
+    stop(
+        "Nenhum dado encontrado para a usina '", id_usina, "' ",
+        "no período de ", data_inicio, " a ", data_fim
+    )
 }
 ```
 
@@ -156,7 +209,7 @@ Usamos `testthat` (edição 3). Os testes ficam em `tests/testthat/`.
 
 test_that("define_hor_prev retorna datas corretas", {
     result <- define_hor_prev("2025-11-07", c("D+0", "D+1"))
-    
+
     expect_s3_class(result, "Date")
     expect_length(result, 2)
     expect_equal(result[1], as.Date("2025-11-07"))
@@ -237,6 +290,7 @@ Antes de submeter um PR, verifique:
 ### 7.1 Bugs
 
 Inclua:
+
 - Versão do R e sistema operacional
 - Passos para reproduzir
 - Comportamento esperado vs. observado
@@ -246,6 +300,7 @@ Inclua:
 ### 7.2 Features
 
 Inclua:
+
 - Caso de uso / problema a resolver
 - Proposta de solução (se houver)
 - Impacto em código existente

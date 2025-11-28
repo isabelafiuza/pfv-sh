@@ -1,9 +1,9 @@
 # pfv-sh
 
-**Modelo de Previsão de Geração Solar Fotovoltaica Semi-horária**
-
-[![R ≥ 4.0](https://img.shields.io/badge/R-%E2%89%A5%204.0-blue)](https://www.r-project.org/)
+[![R-CMD-check](https://github.com/isabelafiuza/pfv-sh/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/isabelafiuza/pfv-sh/actions/workflows/R-CMD-check.yaml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+**Modelo de Previsão de Geração Solar Fotovoltaica Semi-horária**
 
 ---
 
@@ -84,18 +84,14 @@ O `pfv-sh` é um pacote R para **previsão de geração solar fotovoltaica** com
 - R ≥ 4.0
 - Dependências gerenciadas via `renv`
 
-### 3.2 Instalação Local
+### 3.2 Instalação
 
 ```bash
-# Clone o repositório
-git clone https://github.com/isabelafiuza/pfv-sh.git
-cd pfv-sh
+# Instale o pacote usando remotes para desenvolvimento (branch main)
+Rscript -e "remotes::install_github(\"isabelafiuza/pfv-sh\")"
 
-# Restaure as dependências
-R -e "renv::restore()"
-
-# Instale o pacote
-R -e "remotes::install_local('.', dependencies = FALSE)"
+# Instale o pacote usando remotes de uma tag específica (para uso)
+Rscript -e "remotes::install_github(\"isabelafiuza/pfv-sh@release\")"
 ```
 
 ### 3.3 Execução via Docker
@@ -184,7 +180,17 @@ O arquivo `config.jsonc` no diretório de dados controla a execução:
 }
 ```
 
-### 4.3 Uso Programático em R
+### 4.3 Variáveis de Ambiente
+
+| Variável    | Descrição    | Valores                          |
+| ----------- | ------------ | -------------------------------- |
+| `LOG_LEVEL` | Nível de log | `debug`, `info`, `warn`, `error` |
+
+```bash
+LOG_LEVEL=debug Rscript main.r --datadir ./data
+```
+
+### 4.4 Uso Programático em R
 
 ```r
 library(pfvsh)
@@ -215,12 +221,37 @@ if (config$mode == "predict") {
 
 ### 5.1 Dados de Entrada
 
-| Arquivo                    | Descrição           | Colunas Principais                                                                          |
-| -------------------------- | ------------------- | ------------------------------------------------------------------------------------------- |
-| `usinas.csv`               | Cadastro das usinas | `id_usina`, `latitude`, `longitude`, `capacidade_instalada_MW`                              |
-| `geracao_observada.csv`    | Geração histórica   | `id_usina`, `data_hora_observacao`, `valor`                                                 |
-| `irradiancia_prevista.csv` | Previsões NWP       | `id_modelo_nwp`, `latitude`, `longitude`, `data_hora_rodada`, `data_hora_previsao`, `valor` |
-| `config.jsonc`             | Configuração        | Ver seção 4.2                                                                               |
+O diretório de dados deve conter os seguintes arquivos:
+
+| Arquivo                        | Formato        | Descrição                                     |
+| ------------------------------ | -------------- | --------------------------------------------- |
+| `config.jsonc`                 | JSONC          | Configuração do modelo                        |
+| `usinas.parquet`               | Parquet ou CSV | Cadastro de usinas (id, lat, lon, capacidade) |
+| `geracao_observada.parquet`    | Parquet ou CSV | Série temporal de geração por fonte           |
+| `irradiancia_prevista.parquet` | Parquet ou CSV | Previsões NWP de irradiância                  |
+
+#### Schemas de Dados
+
+##### `usinas.parquet`
+
+```
+id_usina,latitude,longitude,capacidade_instalada_MW,data_inicio_operacao_comercial
+USINA_A,-23.5505,-46.6333,100.0,2020-01-01 12:00:00
+```
+
+##### `geracao_observada.parquet`
+
+```
+id_fonte_observacao,id_usina,data_hora_observacao,valor,status
+PI,USINA_A,2024-01-01 00:00:00,45.2,0
+```
+
+##### `irradiancia_prevista.parquet`
+
+```
+id_modelo_nwp,latitude,longitude,data_hora_rodada,data_hora_previsao,valor
+GFS,-23.5,-46.5,2024-01-01 00:00:00,2024-01-01 12:00:00,850.5
+```
 
 ### 5.2 Dados de Saída
 
@@ -266,18 +297,7 @@ Modelo baseado em regressão linear:
 - **RLM (Regressão Linear Múltipla)**: Geração ~ Irradiância + outras variáveis
 - **Critério de seleção**: Menor erro médio absoluto
 
-### 6.3 Baseline
-
-Para comparação, utilize a persistência (última geração observada no mesmo horário).
-
 ---
-
-## 7. Limitações Conhecidas
-
-1. **Lacunas de dados NWP**: Preenchidas com `NA`; podem impactar previsões
-2. **Horários de baixa geração**: Excluídos do treinamento (fora do período solar)
-3. **Dados insuficientes**: Modelo dummy retornado se `n_dados < amos_min`
-4. **Validação cruzada**: Não implementada (walk-forward validation planejado)
 
 ---
 
@@ -287,12 +307,26 @@ Este projeto está licenciado sob a licença MIT. Veja [LICENSE](LICENSE) para d
 
 ---
 
-## 9. Contribuindo
+## 📚 Documentação Adicional
 
-Veja [CONTRIBUTING.md](CONTRIBUTING.md) para diretrizes de contribuição.
+- [ARCHITECTURE.md](ARCHITECTURE.md) - Detalhes da arquitetura da aplicação
+- [CHANGELOG.md](CHANGELOG.md) - Histórico de versões
 
 ---
 
-## 10. Referências
+## 📞 Contato
 
-- [pfvIO](https://github.com/lkhenayfis/pfvIO) - Pacote de I/O para dados de previsão fotovoltaica
+- **Organização**: [ONS - Operador Nacional do Sistema Elétrico](https://www.ons.org.br/)
+- **Issues**: [GitHub Issues](https://github.com/isabelafiuza/pfv-sh/issues)
+
+## Citação
+
+```bibtex
+@software{mhpfv2025,
+  author = {{ONS - Operador Nacional do Sistema Elétrico}},
+  title = {pfv-sh: Modelo de Previsão de Geração Solar Fotovoltaica Semi-horária},
+  year = {2025},
+  url = {https://github.com/isabelafiuza/pfv-sh},
+  version = {0.1.0}
+}
+```
