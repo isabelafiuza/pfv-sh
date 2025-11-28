@@ -310,6 +310,7 @@ Este projeto está licenciado sob a licença MIT. Veja [LICENSE](LICENSE) para d
 ## 📚 Documentação Adicional
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) - Detalhes da arquitetura da aplicação
+- [CONTRIBUTING.md](CONTRIBUTING.md) - Diretrizes para contribuição
 - [CHANGELOG.md](CHANGELOG.md) - Histórico de versões
 
 ---
