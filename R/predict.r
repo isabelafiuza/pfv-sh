@@ -60,8 +60,11 @@ predict_main <- function(args) {
         dt_usinas = dt_usinas,
         dt_ger_obs = data_set_ger,
         dt_prev = data_set_met,
+        v_modelos_nwp = v_modelos_nwp,
+        v_horizonte = v_horizonte,
         parametros_modelo_previsao = args$modelos_previsao,
         parametros_periodo_geracao = args$parametros_periodo_geracao,
+        local_modelo = args$output,
         data_prev = data_prev
     )
 
@@ -109,8 +112,8 @@ predict_main <- function(args) {
 #'
 #' @keywords internal
 predict_usina <- function(
-    iu, dt_usinas, dt_ger_obs, dt_prev, parametros_modelo_previsao,
-    parametros_periodo_geracao, data_prev
+    iu, dt_usinas, dt_ger_obs, dt_prev, v_modelos_nwp, v_horizonte, parametros_modelo_previsao,
+    parametros_periodo_geracao, local_modelo, data_prev
 ) {
     # Filtra os dados de geracao e meteorologicos referentes a usina atual
     dad_usi <- dt_usinas[id_usina == iu]
@@ -130,7 +133,7 @@ predict_usina <- function(
     })
 
     # leitura dos parametros ajustados
-    mod_aju <- readRDS(paste(args$output, "BAUFI1_modelos_ajustados.rds", sep = "/"))
+    mod_aju <- readRDS(paste(local_modelo, "BAUFI1_modelos_ajustados.rds", sep = "/"))
 
     ger_prev <- lapply(seq_along(mod_aju), function(i) {
         pars <- mod_aju[[i]]$combinacao_ajuste
@@ -139,8 +142,13 @@ predict_usina <- function(
         modelo_parametros <- parametros_modelo_previsao[[modelo_despacho]]
 
         prev <- parse_predict(
-            mod_aju[[i]]$modelo, pars, data_prev,
-            ger_usi, prev_met_usi, modelo_parametros
+            modelo = mod_aju[[i]]$modelo,
+            pars = pars, 
+            data_prev = data_prev,
+            ger_usi = ger_usi, 
+            prev_met_usi = prev_met_usi, 
+            v_horizonte = v_horizonte,
+            modelo_parametros = modelo_parametros
         )
         list(
             combinacao_ajuste = pars,
