@@ -44,7 +44,7 @@ predict_main <- function(args) {
 
     v_usinas <- args$ids_usinas
     v_horizonte <- args$horizonte_dias
-    # v_modelos_nwp <- args$modelos_NWP
+    v_modelos_nwp <- args$modelos_NWP
 
     # define horizonte de previsao
     data_prev <- define_hor_prev(args$data_referencia, v_horizonte)
