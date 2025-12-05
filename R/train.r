@@ -60,6 +60,7 @@ train_main <- function(args) {
         v_modelos_previsao = v_modelos_previsao,
         parametros_modelo_previsao = args$modelos_previsao,
         parametros_periodo_geracao = args$parametros_periodo_geracao,
+        local_escrita = args$out,
         data_fim_treino = data_fim_treino
     )
 }
@@ -96,7 +97,7 @@ train_main <- function(args) {
 treina_usina <- function(
     iu, dt_usinas, dt_ger_obs, dt_prev, v_modelos_nwp,
     v_horizonte, v_modelos_previsao, parametros_modelo_previsao,
-    parametros_periodo_geracao, data_fim_treino
+    parametros_periodo_geracao, local_escrita, data_fim_treino
 ) {
     # Filtra os dados referentes a usina atual
     dad_usi <- dt_usinas[id_usina == iu]
@@ -134,7 +135,7 @@ treina_usina <- function(
         data_fim_treino = data_fim_treino
     )
     # TODO - alterar para salvar todos os modelos
-    saveRDS(mod_aju, file = paste(args$output, paste0(iu, "_modelos_ajustados.rds"), sep = "/"))
+    saveRDS(mod_aju, file = paste(local_escrita, paste0(iu, "_modelos_ajustados.rds"), sep = "/"))
 }
 
 #' Treina Modelo Individual
