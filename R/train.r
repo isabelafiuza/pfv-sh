@@ -611,7 +611,7 @@ seleciona_janela <- function(dt, data_ref, janela_dias_treinamento) {
     dt <- copy(dt)
     dt[, data := as.Date(data_hora)]
 
-    dt <- dt[data < data_ref]
+    dt <- dt[data < data_ref[1]]
 
     # considerar apenas as ultimas `janela_dias` datas
     ultimas_datas <- head(sort(unique(dt$data), decreasing = TRUE), janela_dias_treinamento)
