@@ -60,9 +60,10 @@ train_main <- function(args) {
         v_modelos_previsao = v_modelos_previsao,
         parametros_modelo_previsao = args$modelos_previsao,
         parametros_periodo_geracao = args$parametros_periodo_geracao,
-        local_escrita = args$out,
+        local_escrita = args$artifact,
         data_fim_treino = data_fim_treino
     )
+
 }
 
 #' Treina Modelos para Uma Usina
@@ -125,7 +126,7 @@ treina_usina <- function(
     )
 
     # gera lista com as combinacoes nwp x passo de previsao x meia-hora x modelos de previsao
-    list_comb <- gera_combinacoes_modelo(v_modelos_nwp, v_horizonte, periodo_ger, v_modelos_previsao[1])
+    list_comb <- gera_combinacoes_modelo(v_modelos_nwp, v_horizonte, periodo_ger, v_modelos_previsao)
 
     # treina modelo
     mod_aju <- lapply(list_comb, train_modelo,
@@ -134,8 +135,11 @@ treina_usina <- function(
         param_modelo_previsao = parametros_modelo_previsao,
         data_fim_treino = data_fim_treino
     )
-    # TODO - alterar para salvar todos os modelos
-    saveRDS(mod_aju, file = paste(local_escrita, paste0(iu, "_modelos_ajustados.rds"), sep = "/"))
+
+    # escreve artefato
+    file_name <- paste0(iu, "_modelos_ajustados")
+    write_model_artifact(mod_aju, file_name, local_escrita)
+
 }
 
 #' Treina Modelo Individual

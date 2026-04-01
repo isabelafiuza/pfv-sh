@@ -64,7 +64,7 @@ predict_main <- function(args) {
         v_horizonte = v_horizonte,
         parametros_modelo_previsao = args$modelos_previsao,
         parametros_periodo_geracao = args$parametros_periodo_geracao,
-        local_modelo = args$output,
+        local_modelo = args$artifact,
         data_prev = data_prev
     )
 
@@ -92,7 +92,11 @@ predict_main <- function(args) {
         data_hora_previsao
     )
 
-    return(dt_final)
+    # escreve 
+    write_previsao_geracao_fotovoltaica(
+        dt = dt_final,
+        output_dir = args$output
+    )
 }
 
 #' Gera Previsoes para Uma Usina
@@ -133,9 +137,11 @@ predict_usina <- function(
     })
 
     # leitura dos parametros ajustados
-    mod_aju <- readRDS(paste(local_modelo, "BAUFI1_modelos_ajustados.rds", sep = "/"))
+    file_name <- paste0(iu, "_modelos_ajustados")
+    mod_aju <- pfvIO:::get_model_artifact(file_name, local_modelo)
 
     ger_prev <- lapply(seq_along(mod_aju), function(i) {
+        print(i)
         pars <- mod_aju[[i]]$combinacao_ajuste
 
         modelo_despacho <- pars$modelo_prev
@@ -350,7 +356,7 @@ parse_predict.fisico_estimado <- function(modelo, ...) {
     variaveis_previstas <- dt_prev_filt[, .SD, .SDcols = cols]
 
     # gera previsao
-    dt_prev <- predict(nlmod, variaveis_previstas, interval = "prediction")
+    dt_prev <- as.data.table(predict(nlmod, variaveis_previstas, interval = "prediction"))
     dt_prev_out <- dt_prev$fit
 
     return(dt_prev_out)
