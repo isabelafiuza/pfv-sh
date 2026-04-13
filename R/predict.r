@@ -83,6 +83,9 @@ predict_main <- function(args) {
         })
     )
 
+    # combina previsoes
+    dt_final <- combina_media(dt_final)
+
     # define ordem da previsao
     setorder(
         dt_final,
