@@ -44,7 +44,7 @@ predict_main <- function(args) {
 
     v_usinas <- args$ids_usinas
     v_horizonte <- args$horizonte_dias
-    # v_modelos_nwp <- args$modelos_NWP
+    v_modelos_nwp <- args$modelos_NWP
 
     # define horizonte de previsao
     data_prev <- define_hor_prev(args$data_referencia, v_horizonte)
@@ -60,8 +60,11 @@ predict_main <- function(args) {
         dt_usinas = dt_usinas,
         dt_ger_obs = data_set_ger,
         dt_prev = data_set_met,
+        v_modelos_nwp = v_modelos_nwp,
+        v_horizonte = v_horizonte,
         parametros_modelo_previsao = args$modelos_previsao,
         parametros_periodo_geracao = args$parametros_periodo_geracao,
+        local_modelo = args$artifact,
         data_prev = data_prev
     )
 
@@ -80,6 +83,9 @@ predict_main <- function(args) {
         })
     )
 
+    # combina previsoes
+    dt_final <- combina_media(dt_final)
+
     # define ordem da previsao
     setorder(
         dt_final,
@@ -89,7 +95,11 @@ predict_main <- function(args) {
         data_hora_previsao
     )
 
-    return(dt_final)
+    # escreve 
+    write_previsao_geracao_fotovoltaica(
+        dt = dt_final,
+        output_dir = args$output
+    )
 }
 
 #' Gera Previsoes para Uma Usina
@@ -109,8 +119,8 @@ predict_main <- function(args) {
 #'
 #' @keywords internal
 predict_usina <- function(
-    iu, dt_usinas, dt_ger_obs, dt_prev, parametros_modelo_previsao,
-    parametros_periodo_geracao, data_prev
+    iu, dt_usinas, dt_ger_obs, dt_prev, v_modelos_nwp, v_horizonte, parametros_modelo_previsao,
+    parametros_periodo_geracao, local_modelo, data_prev
 ) {
     # Filtra os dados de geracao e meteorologicos referentes a usina atual
     dad_usi <- dt_usinas[id_usina == iu]
@@ -130,17 +140,24 @@ predict_usina <- function(
     })
 
     # leitura dos parametros ajustados
-    mod_aju <- readRDS(paste(args$output, "BAUFI1_modelos_ajustados.rds", sep = "/"))
+    file_name <- paste0(iu, "_modelos_ajustados")
+    mod_aju <- pfvIO:::get_model_artifact(file_name, local_modelo)
 
     ger_prev <- lapply(seq_along(mod_aju), function(i) {
+        print(i)
         pars <- mod_aju[[i]]$combinacao_ajuste
 
         modelo_despacho <- pars$modelo_prev
         modelo_parametros <- parametros_modelo_previsao[[modelo_despacho]]
 
         prev <- parse_predict(
-            mod_aju[[i]]$modelo, pars, data_prev,
-            ger_usi, prev_met_usi, modelo_parametros
+            modelo = mod_aju[[i]]$modelo,
+            pars = pars, 
+            data_prev = data_prev,
+            ger_usi = ger_usi, 
+            prev_met_usi = prev_met_usi, 
+            v_horizonte = v_horizonte,
+            modelo_parametros = modelo_parametros
         )
         list(
             combinacao_ajuste = pars,
@@ -342,7 +359,7 @@ parse_predict.fisico_estimado <- function(modelo, ...) {
     variaveis_previstas <- dt_prev_filt[, .SD, .SDcols = cols]
 
     # gera previsao
-    dt_prev <- predict(nlmod, variaveis_previstas, interval = "prediction")
+    dt_prev <- as.data.table(predict(nlmod, variaveis_previstas, interval = "prediction"))
     dt_prev_out <- dt_prev$fit
 
     return(dt_prev_out)

@@ -9,7 +9,7 @@
     "output": "./out",
 
     // Caminho para obtencao do artefato do modelo treinado 
-    "artifact": ".",
+    "artifact": "./artifact",
 
     // Lista dos ids de usinas a serem consideradas no processo; vazio usa todas 
     "ids_usinas": ["BAUFI1"],
