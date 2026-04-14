@@ -82,9 +82,10 @@ predict_main <- function(args) {
             )
         })
     )
-
+    
     # combina previsoes
-    dt_final <- combina_media(dt_final)
+    dt_final <- completa_datas(dt = dt_final, discretizacao = "30 min")
+    dt_final <- combina_media(dt = dt_final)
 
     # define ordem da previsao
     setorder(
@@ -144,7 +145,6 @@ predict_usina <- function(
     mod_aju <- pfvIO:::get_model_artifact(file_name, local_modelo)
 
     ger_prev <- lapply(seq_along(mod_aju), function(i) {
-        print(i)
         pars <- mod_aju[[i]]$combinacao_ajuste
 
         modelo_despacho <- pars$modelo_prev
