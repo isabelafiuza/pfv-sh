@@ -39,14 +39,25 @@
 #' \code{\link{parse_predict}} para dispatch de previsao por tipo de modelo
 #'
 #' @export
-predict_main <- function(args) {
+predict_main <- function(args, parallel = FALSE, resume = FALSE) {
+    provenance <- create_provenance(args, "predict", parallel)
+    set_log_context(provenance$run_id, "predict")
+    lg <- get_pkg_logger()
+
+    on.exit({
+        if (provenance$status == "running") {
+            finalize_provenance(provenance, "failed")
+        }
+        write_provenance(provenance, args$output)
+        clear_log_context()
+    }, add = TRUE)
+
     conn <- conectamock_pfv(args$input)
 
     v_usinas <- args$ids_usinas
     v_horizonte <- args$horizonte_dias
     v_modelos_nwp <- args$modelos_NWP
 
-    # define horizonte de previsao
     data_prev <- define_hor_prev(args$data_referencia, v_horizonte)
 
     dt_usinas <- get_usinas(conn, id_usina = v_usinas)
@@ -56,21 +67,46 @@ predict_main <- function(args) {
     data_set_ger <- data_set$ger_obs
     data_set_met <- data_set[names(data_set) != "ger_obs"]
 
-    prev <- lapply(v_usinas, predict_usina,
-        dt_usinas = dt_usinas,
-        dt_ger_obs = data_set_ger,
-        dt_prev = data_set_met,
-        v_modelos_nwp = v_modelos_nwp,
-        v_horizonte = v_horizonte,
-        parametros_modelo_previsao = args$modelos_previsao,
-        parametros_periodo_geracao = args$parametros_periodo_geracao,
-        local_modelo = args$artifact,
-        data_prev = data_prev
-    )
+    prev <- lapply(v_usinas, function(iu) {
+        lg$info("Processando usina: %s", iu)
+        t0 <- proc.time()["elapsed"]
+        result <- tryCatch(
+            predict_usina(iu,
+                dt_usinas = dt_usinas,
+                dt_ger_obs = data_set_ger,
+                dt_prev = data_set_met,
+                v_modelos_nwp = v_modelos_nwp,
+                v_horizonte = v_horizonte,
+                parametros_modelo_previsao = args$modelos_previsao,
+                parametros_periodo_geracao = args$parametros_periodo_geracao,
+                local_modelo = args$artifact,
+                data_prev = data_prev
+            ),
+            error = function(e) {
+                lg$warn("Falha na usina %s: %s", iu, conditionMessage(e))
+                plant_error(iu, e)
+            }
+        )
+        duration <- proc.time()["elapsed"] - t0
 
-    # monta data.table geracao_prevista
+        if (is_plant_error(result)) {
+            update_plant_status(provenance, iu, "failed")
+        } else {
+            update_plant_status(provenance, iu, "completed")
+        }
+
+        result
+    })
+
+    success_idx <- which(!vapply(prev, is_plant_error, logical(1L)))
+    if (length(success_idx) == 0L) {
+        lg$error("Todas as usinas falharam na predicao")
+        finalize_provenance(provenance, "failed")
+        return(invisible(NULL))
+    }
+
     dt_final <- rbindlist(
-        lapply(seq_along(prev), function(i) {
+        lapply(success_idx, function(i) {
             id_usina <- v_usinas[i]
             prev_usina <- prev[[i]]
 
@@ -82,12 +118,10 @@ predict_main <- function(args) {
             )
         })
     )
-    
-    # combina previsoes
+
     dt_final <- completa_datas(dt = dt_final, discretizacao = "30 min")
     dt_final <- combina_media(dt = dt_final)
 
-    # define ordem da previsao
     setorder(
         dt_final,
         id_usina,
@@ -96,11 +130,14 @@ predict_main <- function(args) {
         data_hora_previsao
     )
 
-    # escreve 
     write_previsao_geracao_fotovoltaica(
         dt = dt_final,
         output_dir = args$output
     )
+
+    n_failed <- sum(vapply(prev, is_plant_error, logical(1L)))
+    final_status <- if (n_failed == length(v_usinas)) "failed" else "completed"
+    finalize_provenance(provenance, final_status)
 }
 
 #' Gera Previsoes para Uma Usina
@@ -243,11 +280,8 @@ parse_predict.arimax <- function(modelo, ...) {
 
     dt_filt <- filtra_dado_por_combinacao(pars, prev_met_usi, ger_usi)
 
-    # FUNCAO QUE CHECA OS DADOS DEVE FAZER ISSO
     dt_filt[, (names(dt_filt)) := lapply(.SD, function(x) fifelse(x == 999, NA, x))]
 
-    # Separa os dados de geracao e meteorologicos em treino e previsao -
-    # PODE TRANSFORMAR EM FUNCAO DEPOIS
     dt_treino_filt <- dt_filt[as.Date(data_hora) < data_prev[1]]
     pos_hor <- which(v_horizonte == pars$horiz_prev)
     dt_prev_filt <- dt_filt[as.Date(data_hora) == data_prev[pos_hor]]
@@ -260,9 +294,7 @@ parse_predict.arimax <- function(modelo, ...) {
     )
     setnames(dt_treino_filt, "valor", "ger_obs")
 
-    # avalia numero de conjuntos ger x irr x temp x umid
-    if (dados_suficientes(dt_treino_filt, num_min_dados = modelo_parametros$amos_min) == TRUE) {
-        # normaliza as variaveis necessarias para o ajuste
+    if (dados_suficientes(dt_treino_filt, num_min_dados = modelo_parametros$amos_min)) {
         norm_resultado <- normaliza_variaveis(dt_treino_filt)
         dt_treino_norm <- norm_resultado$dados
         stats_norm <- norm_resultado$stats
@@ -270,7 +302,6 @@ parse_predict.arimax <- function(modelo, ...) {
         cols_norm <- grep("_norm$", names(dt_treino_norm), value = TRUE)
         dt_treino_norm <- dt_treino_norm[, ..cols_norm]
 
-        # normaliza dados previstos com base nas estatisticas de treino
         dt_prev_norm <- copy(dt_prev_filt)
         dt_prev_norm[, data_hora := NULL]
 
@@ -285,7 +316,6 @@ parse_predict.arimax <- function(modelo, ...) {
 
         var_exog <- setdiff(names(dt_prev_norm), "ger_obs_norm")
 
-        # recalibra modelo Arima/Arimax e realiza previsao
         mod_selec <- modelo$modelo_escolhido
         if (mod_selec == "ARIMAX") {
             nlmod1 <- recalibra_arimax(dt_treino_norm, modelo$modelo_final)
@@ -298,9 +328,7 @@ parse_predict.arimax <- function(modelo, ...) {
             prev_norm <- forecast(nlmod1, h = nrow(dt_prev_norm))$mean
         }
 
-        # monta data.table temporario para desnormalizar
         dt_prev_out <- data.table(ger_obs_norm = prev_norm)
-        # desnormaliza previsao
         dt_prev_out <- desnormaliza_variaveis(dt_prev_out, stats_norm)
 
         prev_final <- dt_prev_out$ger_obs
@@ -347,22 +375,17 @@ parse_predict.fisico_estimado <- function(modelo, ...) {
 
     dt_filt <- filtra_dado_por_combinacao(pars, prev_met_usi, ger_usi)
 
-    # separa as variaveis meteorologicas previstas para aplicacao no modelo
     pos_hor <- which(v_horizonte == pars$horiz_prev)
     dt_prev_filt <- dt_filt[as.Date(data_hora) == data_prev[pos_hor]]
     setnames(dt_prev_filt, "valor", "ger_obs")
 
-    # obtem modelo
     nlmod <- mod_aju_comb$modelo_final
     variaveis_usadas <- mod_aju_comb$variaveis_usadas
     cols <- names(dt_prev_filt)[names(dt_prev_filt) %in% variaveis_usadas]
     variaveis_previstas <- dt_prev_filt[, .SD, .SDcols = cols]
 
-    # gera previsao
     dt_prev <- as.data.table(predict(nlmod, variaveis_previstas, interval = "prediction"))
-    dt_prev_out <- dt_prev$fit
-
-    return(dt_prev_out)
+    dt_prev$fit
 }
 
 # AUXILIARES ---------------------------------------------------------------------------------------
@@ -379,8 +402,7 @@ parse_predict.fisico_estimado <- function(modelo, ...) {
 #'
 #' @keywords internal
 carrega_modelo_rds <- function(modelo_previsao, id_usina, diretorio) {
-    mod_aju <- readRDS(paste(diretorio, paste0(id_usina, "_", modelo_previsao, "_ajustado.rds"), sep = "/"))
-    return(mod_aju)
+    readRDS(paste(diretorio, paste0(id_usina, "_", modelo_previsao, "_ajustado.rds"), sep = "/"))
 }
 
 #' Recalibra Modelo ARIMA
@@ -401,10 +423,8 @@ carrega_modelo_rds <- function(modelo_previsao, id_usina, diretorio) {
 #'
 #' @keywords internal
 recalibra_arima <- function(dt, nlmod0) {
-    y <- dt$ger_obs_norm
-    y_validos <- y[!is.na(y)]
-
-    nlmod1 <- Arima(y_validos, model = nlmod0)
+    y_validos <- dt$ger_obs_norm[!is.na(dt$ger_obs_norm)]
+    Arima(y_validos, model = nlmod0)
 }
 
 #' Recalibra Modelo ARIMAX

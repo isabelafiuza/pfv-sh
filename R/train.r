@@ -35,7 +35,19 @@
 #' \code{\link{parse_train}} para dispatch de treinamento por tipo de modelo
 #'
 #' @export
-train_main <- function(args) {
+train_main <- function(args, parallel = FALSE, resume = FALSE) {
+    provenance <- create_provenance(args, "train", parallel)
+    set_log_context(provenance$run_id, "train")
+    lg <- get_pkg_logger()
+
+    on.exit({
+        if (provenance$status == "running") {
+            finalize_provenance(provenance, "failed")
+        }
+        write_provenance(provenance, args$output)
+        clear_log_context()
+    }, add = TRUE)
+
     conn <- conectamock_pfv(args$input)
 
     data_fim_treino <- as.Date(args$data_referencia)
@@ -43,7 +55,7 @@ train_main <- function(args) {
     v_usinas <- args$ids_usinas
     v_horizonte <- args$horizonte_dias
     v_modelos_nwp <- args$modelos_NWP
-    v_modelos_previsao <- sapply(args$modelos_previsao, function(x) x$tipo)
+    v_modelos_previsao <- vapply(args$modelos_previsao, function(x) x$tipo, character(1L))
 
     dt_usinas <- get_usinas(conn, id_usina = v_usinas)
 
@@ -51,19 +63,41 @@ train_main <- function(args) {
     data_set_ger <- data_set$ger_obs
     data_set_met <- data_set[names(data_set) != "ger_obs"]
 
-    artefatos <- lapply(v_usinas, treina_usina,
-        dt_usinas = dt_usinas,
-        dt_ger_obs = data_set_ger,
-        dt_prev = data_set_met,
-        v_modelos_nwp = v_modelos_nwp,
-        v_horizonte = v_horizonte,
-        v_modelos_previsao = v_modelos_previsao,
-        parametros_modelo_previsao = args$modelos_previsao,
-        parametros_periodo_geracao = args$parametros_periodo_geracao,
-        local_escrita = args$artifact,
-        data_fim_treino = data_fim_treino
-    )
+    artefatos <- lapply(v_usinas, function(iu) {
+        lg$info("Processando usina: %s", iu)
+        t0 <- proc.time()["elapsed"]
+        result <- tryCatch(
+            treina_usina(iu,
+                dt_usinas = dt_usinas,
+                dt_ger_obs = data_set_ger,
+                dt_prev = data_set_met,
+                v_modelos_nwp = v_modelos_nwp,
+                v_horizonte = v_horizonte,
+                v_modelos_previsao = v_modelos_previsao,
+                parametros_modelo_previsao = args$modelos_previsao,
+                parametros_periodo_geracao = args$parametros_periodo_geracao,
+                local_escrita = args$artifact,
+                data_fim_treino = data_fim_treino
+            ),
+            error = function(e) {
+                lg$warn("Falha na usina %s: %s", iu, conditionMessage(e))
+                plant_error(iu, e)
+            }
+        )
+        duration <- proc.time()["elapsed"] - t0
 
+        if (is_plant_error(result)) {
+            update_plant_status(provenance, iu, "failed")
+        } else {
+            update_plant_status(provenance, iu, "completed")
+        }
+
+        result
+    })
+
+    n_failed <- sum(vapply(artefatos, is_plant_error, logical(1L)))
+    final_status <- if (n_failed == length(v_usinas)) "failed" else "completed"
+    finalize_provenance(provenance, final_status)
 }
 
 #' Treina Modelos para Uma Usina
@@ -264,9 +298,8 @@ parse_train.fisico_estimado <- function(modelo_parametros, ...) {
     dt_treino <- filtra_dado_por_combinacao(pars, prev_met_usi, ger_usi)
     dt_treino <- elimina_dados_invalidos(dt_treino)
 
-    aumento <- 0 # variavel usada para auxiliar no aumento de amostra, caso necessario
+    aumento <- 0
     repeat {
-        # seleciona janela dos dados para treinamento
         dt_treino_filt <- seleciona_janela(
             dt_treino,
             data_ref = data_fim_treino,
@@ -274,28 +307,23 @@ parse_train.fisico_estimado <- function(modelo_parametros, ...) {
         )
         setnames(dt_treino_filt, "valor", "ger_obs")
 
-        # ajusta dummy
         dt_y <- data.table(ger_obs = rep(0, nrow(dt_treino_filt)))
         dt_x <- data.table(irrad_prev = rep(0, nrow(dt_treino_filt)))
         nlmod0 <- aplica_regressao_linear(dt_y = dt_y, dt_x = dt_x)
         nlmod0$coefficients[is.na(nlmod0$coefficients)] <- 0
 
-        # avalia numero de conjuntos ger x irr x temp x umid
-        if (dados_suficientes(dt_treino_filt, num_min_dados = 10) == TRUE) {
-            # ajusta RLS
+        if (dados_suficientes(dt_treino_filt, num_min_dados = 10)) {
             dt_y <- dt_treino_filt[, .(ger_obs)]
             dt_x <- dt_treino_filt[, .(irrad_prev)]
             nlmod1 <- aplica_regressao_linear(dt_y = dt_y, dt_x = dt_x, nlmod0 = nlmod0)
             nlmod1$coefficients[is.na(nlmod1$coefficients)] <- 0
 
-            # ajusta RLM
             dt_y <- dt_treino_filt[, .(ger_obs)]
             cols <- setdiff(names(dt_treino_filt)[-1], names(dt_y))
             dt_x <- dt_treino_filt[, .SD, .SDcols = cols]
             nlmod2 <- aplica_regressao_linear(dt_y = dt_y, dt_x = dt_x, nlmod0 = nlmod0)
             nlmod2$coefficients[is.na(nlmod2$coefficients)] <- 0
 
-            # condicao de parada
             if ((nlmod1$coefficients[2] > 0 & nlmod2$coefficients[2] > 0) | aumento == 200) {
                 break
             }
@@ -310,14 +338,8 @@ parse_train.fisico_estimado <- function(modelo_parametros, ...) {
         }
     }
 
-    # calcula erro medio in-sample
     erros <- calcula_erros_fisico_estimado(dt = dt_treino_filt[, -1], nlmod1, nlmod2)
-
-    # seleciona modelo
-    selecao <- seleciona_modelo_fisico_estimado(nlmod1, nlmod2, erros)
-
-    return(selecao)
-    # cria diferenciacao para alguns horarios dias para que o ajuste seja apenas ger x irr
+    seleciona_modelo_fisico_estimado(nlmod1, nlmod2, erros)
 }
 
 #' Aplica Regressao Linear
@@ -347,14 +369,12 @@ aplica_regressao_linear <- function(dt_y, dt_x, nlmod0) {
     resposta <- names(dt_y)
     preditoras <- names(dt_x)
 
-    formula <- paste(resposta, "~", paste(preditoras, collapse = "+"))
-    formula_objeto <- as.formula(formula)
+    formula_obj <- as.formula(paste(resposta, "~", paste(preditoras, collapse = "+")))
 
-    modelo <- tryCatch(
-        lm(formula_objeto, data = dados),
+    tryCatch(
+        lm(formula_obj, data = dados),
         error = function(e) nlmod0
     )
-    return(modelo)
 }
 
 #' Treinamento de Modelo ARIMAX
@@ -407,10 +427,8 @@ parse_train.arimax <- function(modelo_parametros, ...) {
 
     dt_treino <- filtra_dado_por_combinacao(pars, prev_met_usi, ger_usi)
 
-    # FUNCAO QUE CHECA OS DADOS DEVE FAZER ISSO
     dt_treino[, (names(dt_treino)) := lapply(.SD, function(x) fifelse(x == 999, NA, x))]
 
-    # seleciona janela dos dados para treinamento
     dt_treino_filt <- seleciona_janela(
         dt_treino,
         data_fim_treino,
@@ -418,12 +436,9 @@ parse_train.arimax <- function(modelo_parametros, ...) {
     )
     setnames(dt_treino_filt, "valor", "ger_obs")
 
-    # ajusta modelo dummy
     nlmod0 <- ajusta_dummy(dt_treino_filt)
 
-    # avalia numero de conjuntos ger x irr x temp x umid
-    if (dados_suficientes(dt_treino_filt, num_min_dados = modelo_parametros$amos_min) == TRUE) {
-        # normaliza as variaveis necessarias para o ajuste
+    if (dados_suficientes(dt_treino_filt, num_min_dados = modelo_parametros$amos_min)) {
         norm_resultado <- normaliza_variaveis(dt_treino_filt)
         dt_treino_norm <- norm_resultado$dados
         stats_norm <- norm_resultado$stats
@@ -431,22 +446,14 @@ parse_train.arimax <- function(modelo_parametros, ...) {
         cols_norm <- grep("_norm$", names(dt_treino_norm), value = TRUE)
         dt_treino_norm <- dt_treino_norm[, ..cols_norm]
 
-        # ajusta ARIMA
         nlmod1 <- ajusta_arima(dt_treino_norm, nlmod0)
-
-        # ajusta ARIMAX
         nlmod2 <- ajusta_arimax(dt_treino_norm, nlmod0)
 
-        # calcular erro medio in-sample
         erros <- calcula_erros(dt_treino_norm, nlmod1, nlmod2)
-
-        # seleciona do modelo com base no desvio e aicc
-        selecao <- seleciona_modelo(nlmod1, nlmod2, erros)
+        seleciona_modelo(nlmod1, nlmod2, erros)
     } else {
-        return(nlmod0)
+        nlmod0
     }
-    # cria diferenciacao para alguns horarios dias para que o ajuste
-    # seja apenas ger x irr
 }
 
 # AUXILIARES ---------------------------------------------------------------------------------------
@@ -471,13 +478,10 @@ parse_train.arimax <- function(modelo_parametros, ...) {
 #'
 #' @keywords internal
 get_dataset <- function(args, conn) {
-    ger_obs <- get_geracao_observada(conn, id_usina = args$ids_usinas)
-    irrad_prev <- get_irradiancia_prevista(conn, id_usina = args$ids_usinas, id_modelo_nwp = args$modelos_NWP)
-
-    out <- list(ger_obs, irrad_prev)
-    names(out) <- c("ger_obs", "irrad_prev")
-
-    return(out)
+    list(
+        ger_obs = get_geracao_observada(conn, id_usina = args$ids_usinas),
+        irrad_prev = get_irradiancia_prevista(conn, id_usina = args$ids_usinas, id_modelo_nwp = args$modelos_NWP)
+    )
 }
 
 #' Preenche Lacunas de Rodadas NWP

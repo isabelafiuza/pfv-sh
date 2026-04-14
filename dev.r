@@ -1,5 +1,5 @@
+devtools::load_all(quiet = TRUE)
 suppressPackageStartupMessages(library(pfvIO))
-suppressPackageStartupMessages(library(pfvsh))
 
 parser <- get_parser()
 args <- parser$parse_args()
