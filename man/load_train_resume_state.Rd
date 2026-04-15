@@ -7,7 +7,7 @@
 load_train_resume_state(args, provenance)
 }
 \arguments{
-\item{args}{lista de argumentos do pipeline (deve conter \code{output} e \code{ids_usinas})}
+\item{args}{lista de argumentos do pipeline (deve conter \code{artifact} e \code{ids_usinas})}
 
 \item{provenance}{environment de proveniencia criado por \code{\link[=create_provenance]{create_provenance()}}}
 }

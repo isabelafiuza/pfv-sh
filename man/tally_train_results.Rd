@@ -19,7 +19,7 @@ tally_train_results(models, v_usinas, provenance, metrics, lg, resume, args)
 
 \item{resume}{logical, se \code{TRUE} chama \code{\link[=write_checkpoint]{write_checkpoint()}} apos cada usina}
 
-\item{args}{lista com \code{output} (dir de checkpoint) e \code{artifact} (dir de artefatos)
+\item{args}{lista com \code{artifact} (dir de artefatos, checkpoints e metadados)
 e demais campos necessarios para \code{\link[=build_model_artifact]{build_model_artifact()}}}
 }
 \value{

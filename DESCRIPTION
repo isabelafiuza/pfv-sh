@@ -1,10 +1,11 @@
 Package: pfvsh
-Title: Modelo de previsao de geracao solar fotovoltaica
+Title: Previsao de geracao solar fotovoltaica semi-horaria para o SIN
 Version: 0.2.0
-Authors@R: 
+Authors@R:
     person("Isabela", "Fiuza", , "isabela.fiuza@ons.org.br", role = c("aut", "cre"))
-Description: Este pacote contem as funcionalidades necessarias para criacao de previsoes de geracao 
-    fotovoltaica.
+Description: Pacote R para previsao operacional de geracao solar fotovoltaica com resolucao
+    semi-horaria (30 minutos), com suporte a modelos ARIMAX e Fisico-Estimado, execucao paralela,
+    retomada a partir de checkpoints e artefatos de observabilidade (proveniencia, metricas, saude).
 License: MIT + file LICENSE
 Depends:
     R (>= 4.0),
