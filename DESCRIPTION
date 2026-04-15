@@ -10,13 +10,15 @@ Depends:
     R (>= 4.0),
     stats (>= 4.0),
     utils (>= 4.0)
-Imports: 
-    data.table (>= 1.17.0),
+Imports:
     argparse (>= 2.2.5),
+    data.table (>= 1.17.0),
+    digest (>= 0.6.0),
+    forecast (>= 8.24.0),
+    jsonlite (>= 1.8.0),
     lgr (>= 0.4.4),
     lubridate (>= 1.9.4),
     pfvIO (>= 0.2.2),
-    forecast (>= 8.24.0),
     zoo (>= 1.8-14)
 Suggests: 
     testthat (>= 3.0.0)

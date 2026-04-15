@@ -14,6 +14,7 @@ treina_usina(
   v_modelos_previsao,
   parametros_modelo_previsao,
   parametros_periodo_geracao,
+  local_escrita,
   data_fim_treino
 )
 }

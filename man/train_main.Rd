@@ -4,7 +4,7 @@
 \alias{train_main}
 \title{Executa Pipeline de Treinamento}
 \usage{
-train_main(args)
+train_main(args, parallel = FALSE, resume = FALSE)
 }
 \arguments{
 \item{args}{Lista de argumentos de configuracao contendo:

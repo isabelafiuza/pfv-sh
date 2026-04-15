@@ -4,7 +4,7 @@
 \alias{predict_main}
 \title{Executa Pipeline de Previsao}
 \usage{
-predict_main(args)
+predict_main(args, parallel = FALSE, resume = FALSE)
 }
 \arguments{
 \item{args}{Lista de argumentos de configuracao contendo:

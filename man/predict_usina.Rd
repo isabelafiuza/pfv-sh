@@ -9,8 +9,11 @@ predict_usina(
   dt_usinas,
   dt_ger_obs,
   dt_prev,
+  v_modelos_nwp,
+  v_horizonte,
   parametros_modelo_previsao,
   parametros_periodo_geracao,
+  local_modelo,
   data_prev
 )
 }

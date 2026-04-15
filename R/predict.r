@@ -41,6 +41,7 @@
 #' @export
 predict_main <- function(args, parallel = FALSE, resume = FALSE) {
     provenance <- create_provenance(args, "predict", parallel)
+    metrics <- create_metrics(provenance$run_id, "predict")
     set_log_context(provenance$run_id, "predict")
     lg <- get_pkg_logger()
 
@@ -49,6 +50,10 @@ predict_main <- function(args, parallel = FALSE, resume = FALSE) {
             finalize_provenance(provenance, "failed")
         }
         write_provenance(provenance, args$output)
+        finalize_metrics(metrics)
+        write_metrics(metrics, args$output)
+        report <- build_health_report(provenance, metrics)
+        write_health_report(report, args$output)
         clear_log_context()
     }, add = TRUE)
 
@@ -70,7 +75,11 @@ predict_main <- function(args, parallel = FALSE, resume = FALSE) {
     prev <- lapply(v_usinas, function(iu) {
         lg$info("Processando usina: %s", iu)
         t0 <- proc.time()["elapsed"]
-        result <- tryCatch(
+        result <- tryCatch({
+            file_name <- paste0(iu, "_modelos_ajustados")
+            artifact <- pfvIO:::get_model_artifact(file_name, args$artifact)
+            validate_artifact(artifact)
+            models <- if (!is.null(artifact$models)) artifact$models else artifact
             predict_usina(iu,
                 dt_usinas = dt_usinas,
                 dt_ger_obs = data_set_ger,
@@ -79,15 +88,15 @@ predict_main <- function(args, parallel = FALSE, resume = FALSE) {
                 v_horizonte = v_horizonte,
                 parametros_modelo_previsao = args$modelos_previsao,
                 parametros_periodo_geracao = args$parametros_periodo_geracao,
-                local_modelo = args$artifact,
+                models = models,
                 data_prev = data_prev
-            ),
-            error = function(e) {
-                lg$warn("Falha na usina %s: %s", iu, conditionMessage(e))
-                plant_error(iu, e)
-            }
-        )
+            )
+        }, error = function(e) {
+            lg$warn("Falha na usina %s: %s", iu, conditionMessage(e))
+            plant_error(iu, e)
+        })
         duration <- proc.time()["elapsed"] - t0
+        record_plant_timing(metrics, iu, duration)
 
         if (is_plant_error(result)) {
             update_plant_status(provenance, iu, "failed")
@@ -149,8 +158,11 @@ predict_main <- function(args, parallel = FALSE, resume = FALSE) {
 #' @param dt_usinas data.table com cadastro de usinas
 #' @param dt_ger_obs data.table com geracao observada
 #' @param dt_prev Lista de data.tables com previsoes meteorologicas
+#' @param v_modelos_nwp Vetor de modelos NWP a filtrar
+#' @param v_horizonte Vetor de horizontes de previsao
 #' @param parametros_modelo_previsao Lista com parametros dos modelos
 #' @param parametros_periodo_geracao Parametros de identificacao do periodo solar
+#' @param models Lista de modelos ajustados carregada por [predict_main()]
 #' @param data_prev Vetor de datas-alvo de previsao
 #'
 #' @return Lista de previsoes, uma para cada combinacao de modelo treinado
@@ -158,9 +170,8 @@ predict_main <- function(args, parallel = FALSE, resume = FALSE) {
 #' @keywords internal
 predict_usina <- function(
     iu, dt_usinas, dt_ger_obs, dt_prev, v_modelos_nwp, v_horizonte, parametros_modelo_previsao,
-    parametros_periodo_geracao, local_modelo, data_prev
+    parametros_periodo_geracao, models, data_prev
 ) {
-    # Filtra os dados de geracao e meteorologicos referentes a usina atual
     dad_usi <- dt_usinas[id_usina == iu]
     ger_usi <- dt_ger_obs[id_usina == iu]
 
@@ -177,18 +188,14 @@ predict_usina <- function(
         dt[, hora_min := format(data_hora_previsao, "%H:%M")]
     })
 
-    # leitura dos parametros ajustados
-    file_name <- paste0(iu, "_modelos_ajustados")
-    mod_aju <- pfvIO:::get_model_artifact(file_name, local_modelo)
-
-    ger_prev <- lapply(seq_along(mod_aju), function(i) {
-        pars <- mod_aju[[i]]$combinacao_ajuste
+    ger_prev <- lapply(seq_along(models), function(i) {
+        pars <- models[[i]]$combinacao_ajuste
 
         modelo_despacho <- pars$modelo_prev
         modelo_parametros <- parametros_modelo_previsao[[modelo_despacho]]
 
         prev <- parse_predict(
-            modelo = mod_aju[[i]]$modelo,
+            modelo = models[[i]]$modelo,
             pars = pars, 
             data_prev = data_prev,
             ger_usi = ger_usi, 

@@ -37,6 +37,7 @@
 #' @export
 train_main <- function(args, parallel = FALSE, resume = FALSE) {
     provenance <- create_provenance(args, "train", parallel)
+    metrics <- create_metrics(provenance$run_id, "train")
     set_log_context(provenance$run_id, "train")
     lg <- get_pkg_logger()
 
@@ -45,6 +46,10 @@ train_main <- function(args, parallel = FALSE, resume = FALSE) {
             finalize_provenance(provenance, "failed")
         }
         write_provenance(provenance, args$output)
+        finalize_metrics(metrics)
+        write_metrics(metrics, args$output)
+        report <- build_health_report(provenance, metrics)
+        write_health_report(report, args$output)
         clear_log_context()
     }, add = TRUE)
 
@@ -76,7 +81,6 @@ train_main <- function(args, parallel = FALSE, resume = FALSE) {
                 v_modelos_previsao = v_modelos_previsao,
                 parametros_modelo_previsao = args$modelos_previsao,
                 parametros_periodo_geracao = args$parametros_periodo_geracao,
-                local_escrita = args$artifact,
                 data_fim_treino = data_fim_treino
             ),
             error = function(e) {
@@ -85,11 +89,20 @@ train_main <- function(args, parallel = FALSE, resume = FALSE) {
             }
         )
         duration <- proc.time()["elapsed"] - t0
+        record_plant_timing(metrics, iu, duration)
 
         if (is_plant_error(result)) {
             update_plant_status(provenance, iu, "failed")
         } else {
             update_plant_status(provenance, iu, "completed")
+            quality <- list(
+                n_combinacoes = length(result),
+                n_modelos_validos = count_valid_models(result)
+            )
+            record_model_quality(metrics, iu, quality)
+            enriched <- build_model_artifact(iu, result, args)
+            file_name <- paste0(iu, "_modelos_ajustados")
+            pfvIO:::write_model_artifact(enriched, file_name, args$artifact)
         }
 
         result
@@ -116,7 +129,7 @@ train_main <- function(args, parallel = FALSE, resume = FALSE) {
 #' @param parametros_periodo_geracao Lista com parametros de identificacao do periodo solar
 #' @param data_fim_treino Data limite para dados de treinamento
 #'
-#' @return Salva artefatos RDS no diretorio de saida (efeito colateral)
+#' @return Lista de pares `combinacao_ajuste` + `modelo`, um por combinacao treinada
 #'
 #' @details
 #' Esta funcao realiza:
@@ -132,7 +145,7 @@ train_main <- function(args, parallel = FALSE, resume = FALSE) {
 treina_usina <- function(
     iu, dt_usinas, dt_ger_obs, dt_prev, v_modelos_nwp,
     v_horizonte, v_modelos_previsao, parametros_modelo_previsao,
-    parametros_periodo_geracao, local_escrita, data_fim_treino
+    parametros_periodo_geracao, data_fim_treino
 ) {
     # Filtra os dados referentes a usina atual
     dad_usi <- dt_usinas[id_usina == iu]
@@ -162,7 +175,6 @@ treina_usina <- function(
     # gera lista com as combinacoes nwp x passo de previsao x meia-hora x modelos de previsao
     list_comb <- gera_combinacoes_modelo(v_modelos_nwp, v_horizonte, periodo_ger, v_modelos_previsao)
 
-    # treina modelo
     mod_aju <- lapply(list_comb, train_modelo,
         ger_usi = ger_usi,
         prev_met_usi = prev_met_usi,
@@ -170,10 +182,7 @@ treina_usina <- function(
         data_fim_treino = data_fim_treino
     )
 
-    # escreve artefato
-    file_name <- paste0(iu, "_modelos_ajustados")
-    write_model_artifact(mod_aju, file_name, local_escrita)
-
+    mod_aju
 }
 
 #' Treina Modelo Individual
