@@ -110,8 +110,8 @@ is_legacy_artifact <- function(artifact) {
 
 #' @keywords internal
 count_valid_models <- function(models) {
-    sum(vapply(models, function(entry) {
-        !identical(entry$modelo$modelo_escolhido, "ARIMA(0,0,0)")
+    sum(vapply(models, function(m) {
+        !identical(m$modelo$modelo_escolhido, "ARIMA(0,0,0)")
     }, logical(1L)))
 }
 
