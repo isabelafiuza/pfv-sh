@@ -22,7 +22,7 @@ make_prev_dt <- function(ids_usina = c("USI1", "USI2"),
     hour_vals <- as.numeric(format(grid$data_hora_previsao, "%H")) +
         as.numeric(format(grid$data_hora_previsao, "%M")) / 60
     grid[, valor := ifelse(hour_vals >= 5.0 & hour_vals <= 18.5,
-        28.0 * sin(pi * (hour_vals - 5.0) / 13.5), 0.0)]
+            28.0 * sin(pi * (hour_vals - 5.0) / 13.5), 0.0)]
     grid[valor < 0, valor := 0.0]
 
     grid[]

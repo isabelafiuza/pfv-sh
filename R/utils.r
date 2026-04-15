@@ -488,7 +488,7 @@ monta_dt_prev <- function(prev_usina_elem, id_usina, data_referencia) {
 
 #' Completa Datas Da Previsao Final
 #'
-#' Gera data.table com sequencia completa de timestamps da previsao final 
+#' Gera data.table com sequencia completa de timestamps da previsao final
 #'
 #' @param dt data.table com colunas:
 #'   \describe{
@@ -504,18 +504,24 @@ monta_dt_prev <- function(prev_usina_elem, id_usina, data_referencia) {
 #'
 #' @keywords internal
 completa_datas <- function(dt, discretizacao) {
-    dt_data_inicio <- dt[, .(data_inicio = as.Date(min(data_hora_previsao))), by = .(id_modelo_prev, id_modelo_nwp, id_usina, data_hora_rodada)]
-    dt_data_fim <- dt[, .(data_fim = as.Date(max(data_hora_previsao))), by = .(id_modelo_prev, id_modelo_nwp, id_usina, data_hora_rodada)]
-    dt_datas_inicio_fim <- merge(dt_data_inicio, dt_data_fim, by = c("id_modelo_prev", "id_modelo_nwp", "id_usina", "data_hora_rodada"))
-    
+    by_cols <- c("id_modelo_prev", "id_modelo_nwp", "id_usina", "data_hora_rodada")
+    dt_data_inicio <- dt[
+        , .(data_inicio = as.Date(min(data_hora_previsao))), by = by_cols
+    ]
+    dt_data_fim <- dt[
+        , .(data_fim = as.Date(max(data_hora_previsao))), by = by_cols
+    ]
+    dt_datas_inicio_fim <- merge(dt_data_inicio, dt_data_fim, by = by_cols)
+
     dt_sequencia_datas <- dt_datas_inicio_fim[,
-        .(data_hora_previsao = seq(as.POSIXct(data_inicio), as.POSIXct(data_fim), by = discretizacao)),
-        by = .(id_modelo_prev, id_modelo_nwp, id_usina, data_hora_rodada)
+        .(data_hora_previsao = seq(
+            as.POSIXct(data_inicio), as.POSIXct(data_fim), by = discretizacao
+        )),
+        by = by_cols
     ]
 
-    dt <- merge(dt, dt_sequencia_datas,
-                 by = c("id_modelo_prev", "id_modelo_nwp", "id_usina", "data_hora_rodada", "data_hora_previsao"),
-                 all.y = TRUE)
+    merge_cols <- c(by_cols, "data_hora_previsao")
+    dt <- merge(dt, dt_sequencia_datas, by = merge_cols, all.y = TRUE)
 
     return(dt)
 }

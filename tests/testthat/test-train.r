@@ -191,8 +191,8 @@ test_that("tally_train_results", {
         lg <- make_lg()
 
         raw_models <- replicate(2L, gen_model_entry(), simplify = FALSE)
-        err_USI1 <- plant_error("USI1", simpleError("model failed"))
-        models <- list(err_USI1, raw_models)
+        err_usi1 <- plant_error("USI1", simpleError("model failed"))
+        models <- list(err_usi1, raw_models)
 
         mockery::stub(f, "pfvIO:::write_model_artifact", function(...) invisible(NULL))
 
@@ -209,8 +209,8 @@ test_that("tally_train_results", {
         lg <- make_lg()
 
         raw_models <- replicate(2L, gen_model_entry(), simplify = FALSE)
-        err_USI1 <- plant_error("USI1", simpleError("model failed"))
-        models <- list(err_USI1, raw_models)
+        err_usi1 <- plant_error("USI1", simpleError("model failed"))
+        models <- list(err_usi1, raw_models)
 
         mockery::stub(f, "pfvIO:::write_model_artifact", function(...) invisible(NULL))
         f(models, c("USI1", "USI2"), prov, metrics, lg, FALSE, cfg)

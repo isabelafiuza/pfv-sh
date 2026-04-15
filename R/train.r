@@ -307,39 +307,71 @@ parse_train.fisico_estimado <- function(modelo_parametros, ...) {
         )
         setnames(dt_treino_filt, "valor", "ger_obs")
 
-        dt_y <- data.table(ger_obs = rep(0, nrow(dt_treino_filt)))
-        dt_x <- data.table(irrad_prev = rep(0, nrow(dt_treino_filt)))
-        nlmod0 <- aplica_regressao_linear(dt_y = dt_y, dt_x = dt_x)
-        nlmod0$coefficients[is.na(nlmod0$coefficients)] <- 0
+        nlmod0 <- ajusta_modelo_fallback(dt_treino_filt)
+        resultado <- ajusta_rls_rlm(dt_treino_filt, nlmod0)
 
-        if (dados_suficientes(dt_treino_filt, num_min_dados = 10)) {
-            dt_y <- dt_treino_filt[, .(ger_obs)]
-            dt_x <- dt_treino_filt[, .(irrad_prev)]
-            nlmod1 <- aplica_regressao_linear(dt_y = dt_y, dt_x = dt_x, nlmod0 = nlmod0)
-            nlmod1$coefficients[is.na(nlmod1$coefficients)] <- 0
-
-            dt_y <- dt_treino_filt[, .(ger_obs)]
-            cols <- setdiff(names(dt_treino_filt)[-1], names(dt_y))
-            dt_x <- dt_treino_filt[, .SD, .SDcols = cols]
-            nlmod2 <- aplica_regressao_linear(dt_y = dt_y, dt_x = dt_x, nlmod0 = nlmod0)
-            nlmod2$coefficients[is.na(nlmod2$coefficients)] <- 0
-
-            if ((nlmod1$coefficients[2] > 0 & nlmod2$coefficients[2] > 0) | aumento == 200) {
-                break
-            }
-            aumento <- aumento + 10
+        if (!is.null(resultado)) {
+            nlmod1 <- resultado$nlmod1
+            nlmod2 <- resultado$nlmod2
+            coefs_ok <- nlmod1$coefficients[2] > 0 && nlmod2$coefficients[2] > 0
+            if (coefs_ok || aumento == 200) break
         } else {
             if (aumento == 200) {
                 nlmod1 <- nlmod0
                 nlmod2 <- nlmod0
                 break
             }
-            aumento <- aumento + 10
         }
+        aumento <- aumento + 10
     }
 
     erros <- calcula_erros_fisico_estimado(dt = dt_treino_filt[, -1], nlmod1, nlmod2)
     seleciona_modelo_fisico_estimado(nlmod1, nlmod2, erros)
+}
+
+#' Ajusta Modelo Fallback (Zeros)
+#'
+#' Cria modelo de regressao linear neutro para uso como fallback.
+#'
+#' @param dt_treino_filt data.table com dados filtrados
+#'
+#' @return Objeto lm com coeficientes zerados
+#'
+#' @keywords internal
+ajusta_modelo_fallback <- function(dt_treino_filt) {
+    dt_y <- data.table(ger_obs = rep(0, nrow(dt_treino_filt)))
+    dt_x <- data.table(irrad_prev = rep(0, nrow(dt_treino_filt)))
+    nlmod0 <- aplica_regressao_linear(dt_y = dt_y, dt_x = dt_x)
+    nlmod0$coefficients[is.na(nlmod0$coefficients)] <- 0
+    nlmod0
+}
+
+#' Ajusta Modelos RLS e RLM
+#'
+#' Tenta ajustar regressao linear simples (RLS) e multipla (RLM).
+#' Retorna NULL se dados insuficientes.
+#'
+#' @param dt_treino_filt data.table com dados filtrados
+#' @param nlmod0 modelo fallback
+#'
+#' @return Lista com nlmod1 e nlmod2, ou NULL se dados insuficientes
+#'
+#' @keywords internal
+ajusta_rls_rlm <- function(dt_treino_filt, nlmod0) {
+    if (!dados_suficientes(dt_treino_filt, num_min_dados = 10)) return(NULL)
+
+    dt_y <- dt_treino_filt[, .(ger_obs)]
+    dt_x <- dt_treino_filt[, .(irrad_prev)]
+    nlmod1 <- aplica_regressao_linear(dt_y = dt_y, dt_x = dt_x, nlmod0 = nlmod0)
+    nlmod1$coefficients[is.na(nlmod1$coefficients)] <- 0
+
+    dt_y <- dt_treino_filt[, .(ger_obs)]
+    cols <- setdiff(names(dt_treino_filt)[-1], names(dt_y))
+    dt_x <- dt_treino_filt[, .SD, .SDcols = cols]
+    nlmod2 <- aplica_regressao_linear(dt_y = dt_y, dt_x = dt_x, nlmod0 = nlmod0)
+    nlmod2$coefficients[is.na(nlmod2$coefficients)] <- 0
+
+    list(nlmod1 = nlmod1, nlmod2 = nlmod2)
 }
 
 #' Aplica Regressao Linear
