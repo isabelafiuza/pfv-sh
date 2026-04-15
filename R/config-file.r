@@ -26,6 +26,7 @@
 parse_config <- function(config, conn) {
     valida_nomes_config(config)
     valida_tipos_config(config)
+    config <- resolve_config_paths(config, attr(conn, "uri"))
 
     config$modelos_previsao <- lapply(config$modelos_previsao, parsearg_modelos_previsao)
     config$data_referencia <- parsearg_data_referencia(config$data_referencia)
@@ -33,6 +34,68 @@ parse_config <- function(config, conn) {
     config$horizonte_dias <- parsearg_horizonte_dias(config$horizonte_dias)
     config$modelos_NWP <- parsearg_modelos_nwp(config$modelos_NWP)
     return(config)
+}
+
+# RESOLUCAO DE CAMINHOS ---------------------------------------------------------------------------
+
+#' Resolve Caminhos Relativos no Config
+#'
+#' Normaliza `input`, `output` e `artifact` em relacao ao diretorio do config.
+#' Caminhos absolutos sao mantidos; caminhos relativos sao resolvidos a partir
+#' de `base_dir`. Diretorios de saida (`output`, `artifact`) sao criados se nao
+#' existirem. Erro se `input` nao existir.
+#'
+#' @param config lista de configuracoes
+#' @param base_dir diretorio base para resolver caminhos relativos (tipicamente
+#'     o diretorio contendo o config.json)
+#'
+#' @return `config` com caminhos normalizados
+#'
+#' @keywords internal
+resolve_config_paths <- function(config, base_dir) {
+    lg <- lgr::get_logger("pfvsh")
+    base_dir <- normalizePath(base_dir, mustWork = TRUE)
+    path_keys <- c("input", "output", "artifact")
+
+    for (key in path_keys) {
+        raw_path <- config[[key]]
+        if (is_relative_path(raw_path)) {
+            config[[key]] <- normalizePath(
+                file.path(base_dir, raw_path), mustWork = FALSE
+            )
+            lg$info(
+                "Caminho relativo '%s' em '%s' resolvido para '%s'",
+                raw_path, key, config[[key]]
+            )
+        }
+    }
+
+    if (!dir.exists(config$input)) {
+        stop(sprintf(
+            "Diretorio de entrada nao encontrado: '%s'", config$input
+        ))
+    }
+
+    for (key in c("output", "artifact")) {
+        if (!dir.exists(config[[key]])) {
+            dir.create(config[[key]], recursive = TRUE)
+            lg$info("Diretorio '%s' criado: %s", key, config[[key]])
+        }
+        config[[key]] <- normalizePath(config[[key]])
+    }
+
+    config
+}
+
+#' Verifica se Caminho e Relativo
+#'
+#' @param path caminho a verificar
+#' @return `TRUE` se relativo, `FALSE` se absoluto ou URI
+#' @keywords internal
+is_relative_path <- function(path) {
+    !startsWith(path, "/") &&
+        !startsWith(path, "s3://") &&
+        !startsWith(path, "~")
 }
 
 # VALIDACOES DE CONFIG -----------------------------------------------------------------------------

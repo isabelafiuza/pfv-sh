@@ -40,7 +40,7 @@ test_that("train_main resume skips completed plants", {
 
     prov <- create_provenance(config, "train", FALSE)
     update_plant_status(prov, plant_ids[1], "completed")
-    write_checkpoint(prov, tmp_output)
+    write_checkpoint(prov, tmp_artifact)
 
     artifact_before <- gen_model_artifact(id_usina = plant_ids[1])
     saveRDS(artifact_before, artifact_path(tmp_artifact, plant_ids[1]))
@@ -70,7 +70,7 @@ test_that("train_main resume with config mismatch runs from scratch", {
 
     prov_other <- create_provenance(config_other, "train", FALSE)
     update_plant_status(prov_other, plant_ids[1], "completed")
-    write_checkpoint(prov_other, tmp_output)
+    write_checkpoint(prov_other, tmp_artifact)
 
     expect_no_error(train_main(config, resume = TRUE))
 
@@ -89,10 +89,10 @@ test_that("train_main cleans up checkpoint after successful resume run", {
 
     train_main(config, resume = TRUE)
 
-    cp_files <- list.files(tmp_output, pattern = "^checkpoint-.*\\.json$")
+    cp_files <- list.files(tmp_artifact, pattern = "^checkpoint-.*\\.json$")
     expect_equal(length(cp_files), 0L)
 
-    prov_files <- list.files(tmp_output, pattern = "^provenance-train-.*\\.json$")
+    prov_files <- list.files(tmp_artifact, pattern = "^provenance-train-.*\\.json$")
     expect_equal(length(prov_files), 1L)
 })
 

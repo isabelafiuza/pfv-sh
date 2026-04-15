@@ -150,6 +150,64 @@ split_args_by_plant <- function(extra_args, v_usinas) {
     out
 }
 
+#' Despacha Processamento de Usinas (Sequencial ou Paralelo)
+#'
+#' Itera sobre `v_usinas` chamando `fn` via `do.call`, com isolamento de erro
+#' por usina via `plant_error`. No modo sequencial, o tempo por usina e medido
+#' individualmente. No modo paralelo, o tempo total do lote e distribuido
+#' igualmente.
+#'
+#' @param v_usinas character vector de IDs de usinas a processar
+#' @param fn funcao worker a chamar para cada usina; assinatura
+#'     `fn(iu, ...)` onde `...` sao os campos de `extra_args`
+#' @param extra_args lista nomeada de argumentos adicionais a passar para `fn`
+#' @param parallel logical, se `TRUE` usa `future.apply::future_lapply`
+#' @param metrics objeto de metricas criado por [create_metrics()]
+#' @param lg objeto logger
+#'
+#' @return lista com os resultados por usina (na ordem de `v_usinas`);
+#'     erros sao encapsulados como objetos `plant_error`
+#'
+#' @export
+run_plants <- function(v_usinas, fn, extra_args, parallel, metrics, lg) {
+    if (parallel) {
+        per_plant_args <- split_args_by_plant(extra_args, v_usinas)
+        batch_start <- proc.time()[["elapsed"]]
+        .fn <- fn
+        .plant_error <- plant_error
+        results <- future.apply::future_lapply(
+            per_plant_args,
+            function(plant_args) {
+                iu <- plant_args$.iu
+                plant_args$.iu <- NULL
+                tryCatch(
+                    do.call(.fn, c(list(iu), plant_args)),
+                    error = function(e) .plant_error(iu, e)
+                )
+            },
+            future.seed = TRUE,
+            future.globals = list(.fn = .fn, .plant_error = .plant_error)
+        )
+        batch_elapsed <- proc.time()[["elapsed"]] - batch_start
+        est_per_plant <- round(batch_elapsed / length(v_usinas), 2L)
+        for (iu in v_usinas) record_plant_timing(metrics, iu, est_per_plant)
+    } else {
+        results <- lapply(v_usinas, function(iu) {
+            t0 <- proc.time()[["elapsed"]]
+            result <- tryCatch(
+                do.call(fn, c(list(iu), extra_args)),
+                error = function(e) {
+                    lg$warn("Falha na usina %s: %s", iu, conditionMessage(e))
+                    plant_error(iu, e)
+                }
+            )
+            record_plant_timing(metrics, iu, round(proc.time()[["elapsed"]] - t0, 2L))
+            result
+        })
+    }
+    results
+}
+
 #' Extrai Nome da Estrategia do Plano Atual
 #'
 #' @param plan_obj objeto de plano retornado por `future::plan()`

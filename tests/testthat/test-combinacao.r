@@ -36,7 +36,6 @@ test_that("combina_media", {
 
     test_that("combina_media adds rows with id_modelo_prev == 'combinado'", {
         dt <- make_prev_dt()
-        mockery::stub(f, "plota_suavizacao", function(...) invisible(NULL))
 
         result <- f(dt)
 
@@ -45,7 +44,6 @@ test_that("combina_media", {
 
     test_that("combina_media returns more rows than input", {
         dt <- make_prev_dt()
-        mockery::stub(f, "plota_suavizacao", function(...) invisible(NULL))
 
         result <- f(dt)
 
@@ -55,7 +53,6 @@ test_that("combina_media", {
     test_that("combina_media adds one combinado group per usina x nwp x rodada x timestamp", {
         dt <- make_prev_dt(ids_usina = c("USI1"), ids_nwp = c("GFS"), n_modelos_prev = 3L)
         n_input_rows <- nrow(dt)
-        mockery::stub(f, "plota_suavizacao", function(...) invisible(NULL))
 
         result <- f(dt)
         n_combinado <- nrow(result[id_modelo_prev == "combinado"])
@@ -65,7 +62,6 @@ test_that("combina_media", {
 
     test_that("combina_media preserves original model rows unchanged", {
         dt <- make_prev_dt(ids_usina = "USI1", n_modelos_prev = 2L)
-        mockery::stub(f, "plota_suavizacao", function(...) invisible(NULL))
 
         result <- f(dt)
         orig_models <- result[id_modelo_prev != "combinado"]
@@ -77,7 +73,6 @@ test_that("combina_media", {
         dt <- make_prev_dt(ids_usina = "USI1", ids_nwp = "GFS", n_modelos_prev = 2L, n_half_hours = 4L)
         dt[id_modelo_prev == "modelo_1", valor := 10.0]
         dt[id_modelo_prev == "modelo_2", valor := 20.0]
-        mockery::stub(f, "plota_suavizacao", function(...) invisible(NULL))
 
         result <- f(dt)
         combinado_rows <- result[id_modelo_prev == "combinado"]
@@ -95,7 +90,6 @@ test_that("combina_media", {
             "id_usina", "id_modelo_prev", "id_modelo_nwp",
             "data_hora_rodada", "data_hora_previsao", "valor"
         )
-        mockery::stub(f, "plota_suavizacao", function(...) invisible(NULL))
 
         result <- f(dt)
 

@@ -29,6 +29,78 @@ gen_config <- function() {
     )
 }
 
+# TESTS FOR is_relative_path ---------------------------------------------------
+
+test_that("is_relative_path detects relative paths", {
+    expect_true(is_relative_path("./data"))
+    expect_true(is_relative_path("data"))
+    expect_true(is_relative_path("../out"))
+    expect_true(is_relative_path("artifact"))
+})
+
+test_that("is_relative_path detects absolute and URI paths", {
+    expect_false(is_relative_path("/home/user/data"))
+    expect_false(is_relative_path("s3://bucket/key"))
+    expect_false(is_relative_path("~/data"))
+})
+
+# TESTS FOR resolve_config_paths -----------------------------------------------
+
+test_that("resolve_config_paths resolves relative paths against base_dir", {
+    withr::with_tempdir({
+        base <- getwd()
+        dir.create("data")
+        conf <- list(input = "./data", output = "./out", artifact = "./artifact")
+
+        result <- resolve_config_paths(conf, base)
+
+        expect_equal(result$input, normalizePath(file.path(base, "data")))
+        expect_equal(result$output, normalizePath(file.path(base, "out")))
+        expect_equal(result$artifact, normalizePath(file.path(base, "artifact")))
+    })
+})
+
+test_that("resolve_config_paths creates output and artifact dirs", {
+    withr::with_tempdir({
+        base <- getwd()
+        dir.create("data")
+        conf <- list(input = "./data", output = "./out", artifact = "./artifact")
+
+        expect_false(dir.exists(file.path(base, "out")))
+        expect_false(dir.exists(file.path(base, "artifact")))
+
+        resolve_config_paths(conf, base)
+
+        expect_true(dir.exists(file.path(base, "out")))
+        expect_true(dir.exists(file.path(base, "artifact")))
+    })
+})
+
+test_that("resolve_config_paths errors when input dir does not exist", {
+    withr::with_tempdir({
+        base <- getwd()
+        conf <- list(input = "./missing", output = "./out", artifact = "./artifact")
+
+        expect_error(
+            resolve_config_paths(conf, base),
+            "Diretorio de entrada nao encontrado"
+        )
+    })
+})
+
+test_that("resolve_config_paths preserves absolute paths", {
+    withr::with_tempdir({
+        base <- getwd()
+        abs_input <- file.path(base, "abs_data")
+        dir.create(abs_input)
+        conf <- list(input = abs_input, output = "./out", artifact = "./artifact")
+
+        result <- resolve_config_paths(conf, base)
+
+        expect_equal(result$input, normalizePath(abs_input))
+    })
+})
+
 # TESTS FOR valida_nomes_config ------------------------------------------------
 
 test_that("valida_nomes_config accepts valid config", {

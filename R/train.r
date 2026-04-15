@@ -4,7 +4,7 @@
 #' permitir retomada do pipeline. Retorna `completed = character(0L)` se
 #' nenhum checkpoint valido for encontrado.
 #'
-#' @param args lista de argumentos do pipeline (deve conter `output` e `ids_usinas`)
+#' @param args lista de argumentos do pipeline (deve conter `artifact` e `ids_usinas`)
 #' @param provenance environment de proveniencia criado por [create_provenance()]
 #'
 #' @return lista com `provenance` (atualizado) e `completed` (character vector
@@ -14,7 +14,7 @@
 #'
 #' @export
 load_train_resume_state <- function(args, provenance) {
-    checkpoint <- read_checkpoint(args$output, args)
+    checkpoint <- read_checkpoint(args$artifact, args)
     if (is.null(checkpoint)) {
         return(list(provenance = provenance, completed = character(0L)))
     }
@@ -23,64 +23,6 @@ load_train_resume_state <- function(args, provenance) {
         update_plant_status(provenance, iu, "completed")
     }
     list(provenance = provenance, completed = completed_plants)
-}
-
-#' Despacha Processamento de Usinas (Sequencial ou Paralelo)
-#'
-#' Itera sobre `v_usinas` chamando `fn` via `do.call`, com isolamento de erro
-#' por usina via `plant_error`. No modo sequencial, o tempo por usina e medido
-#' individualmente. No modo paralelo, o tempo total do lote e distribuido
-#' igualmente.
-#'
-#' @param v_usinas character vector de IDs de usinas a processar
-#' @param fn funcao worker a chamar para cada usina; assinatura
-#'     `fn(iu, ...)` onde `...` sao os campos de `extra_args`
-#' @param extra_args lista nomeada de argumentos adicionais a passar para `fn`
-#' @param parallel logical, se `TRUE` usa `future.apply::future_lapply`
-#' @param metrics objeto de metricas criado por [create_metrics()]
-#' @param lg objeto logger
-#'
-#' @return lista com os resultados por usina (na ordem de `v_usinas`);
-#'     erros sao encapsulados como objetos `plant_error`
-#'
-#' @export
-run_plants <- function(v_usinas, fn, extra_args, parallel, metrics, lg) {
-    if (parallel) {
-        per_plant_args <- split_args_by_plant(extra_args, v_usinas)
-        batch_start <- proc.time()[["elapsed"]]
-        .fn <- fn
-        .plant_error <- plant_error
-        results <- future.apply::future_lapply(
-            per_plant_args,
-            function(plant_args) {
-                iu <- plant_args$.iu
-                plant_args$.iu <- NULL
-                tryCatch(
-                    do.call(.fn, c(list(iu), plant_args)),
-                    error = function(e) .plant_error(iu, e)
-                )
-            },
-            future.seed = TRUE,
-            future.globals = list(.fn = .fn, .plant_error = .plant_error)
-        )
-        batch_elapsed <- proc.time()[["elapsed"]] - batch_start
-        est_per_plant <- round(batch_elapsed / length(v_usinas), 2L)
-        for (iu in v_usinas) record_plant_timing(metrics, iu, est_per_plant)
-    } else {
-        results <- lapply(v_usinas, function(iu) {
-            t0 <- proc.time()[["elapsed"]]
-            result <- tryCatch(
-                do.call(fn, c(list(iu), extra_args)),
-                error = function(e) {
-                    lg$warn("Falha na usina %s: %s", iu, conditionMessage(e))
-                    plant_error(iu, e)
-                }
-            )
-            record_plant_timing(metrics, iu, round(proc.time()[["elapsed"]] - t0, 2L))
-            result
-        })
-    }
-    results
 }
 
 #' Processa Resultados de Treinamento por Usina
@@ -95,7 +37,7 @@ run_plants <- function(v_usinas, fn, extra_args, parallel, metrics, lg) {
 #' @param metrics objeto de metricas criado por [create_metrics()]
 #' @param lg objeto logger
 #' @param resume logical, se `TRUE` chama [write_checkpoint()] apos cada usina
-#' @param args lista com `output` (dir de checkpoint) e `artifact` (dir de artefatos)
+#' @param args lista com `artifact` (dir de artefatos, checkpoints e metadados)
 #'     e demais campos necessarios para [build_model_artifact()]
 #'
 #' @return inteiro com o numero de usinas que falharam
@@ -118,7 +60,7 @@ tally_train_results <- function(models, v_usinas, provenance, metrics, lg, resum
             file_name <- paste0(iu, "_modelos_ajustados")
             pfvIO:::write_model_artifact(enriched, file_name, args$artifact)
         }
-        if (resume) write_checkpoint(provenance, args$output)
+        if (resume) write_checkpoint(provenance, args$artifact)
         lg$info("Usina %s processada (%d/%d)", iu, i, n_total)
     }
     n_failed
@@ -169,11 +111,11 @@ train_main <- function(args, parallel = FALSE, resume = FALSE) {
         if (provenance$status == "running") {
             finalize_provenance(provenance, "failed")
         }
-        write_provenance(provenance, args$output)
+        write_provenance(provenance, args$artifact)
         finalize_metrics(metrics)
-        write_metrics(metrics, args$output)
+        write_metrics(metrics, args$artifact)
         report <- build_health_report(provenance, metrics)
-        write_health_report(report, args$output)
+        write_health_report(report, args$artifact)
         clear_log_context()
     }, add = TRUE)
 
@@ -181,7 +123,7 @@ train_main <- function(args, parallel = FALSE, resume = FALSE) {
 
     if (length(v_usinas) == 0L) {
         finalize_provenance(provenance, "completed")
-        cleanup_checkpoint(args$output)
+        cleanup_checkpoint(args$artifact)
         return(invisible(NULL))
     }
 
@@ -221,7 +163,7 @@ train_main <- function(args, parallel = FALSE, resume = FALSE) {
 
     final_status <- if (n_failed == length(v_usinas)) "failed" else "completed"
     finalize_provenance(provenance, final_status)
-    if (resume) cleanup_checkpoint(args$output)
+    if (resume) cleanup_checkpoint(args$artifact)
 }
 
 #' Treina Modelos para Uma Usina
@@ -477,23 +419,6 @@ parse_train.arimax <- function(modelo_parametros, ...) {
 }
 
 # AUXILIARES ---------------------------------------------------------------------------------------
-
-#' Cria Dataset para Treinamento
-#'
-#' Carrega dados para treinamento dos modelos.
-#'
-#' @param args Lista com `ids_usinas` e `modelos_NWP`
-#' @param conn Conexao com banco de dados
-#'
-#' @return Lista com `ger_obs` e `irrad_prev`
-#'
-#' @keywords internal
-get_dataset <- function(args, conn) {
-    list(
-        ger_obs = get_geracao_observada(conn, id_usina = args$ids_usinas),
-        irrad_prev = get_irradiancia_prevista(conn, id_usina = args$ids_usinas, id_modelo_nwp = args$modelos_NWP)
-    )
-}
 
 #' Preenche Lacunas de Rodadas NWP
 #'

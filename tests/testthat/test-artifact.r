@@ -187,60 +187,12 @@ test_that("validate_artifact errors when models is empty list", {
     expect_error(validate_artifact(artifact), "models")
 })
 
-# TESTS FOR validate_artifact (legacy format) ----------------------------------
+test_that("validate_artifact errors when metadata is missing", {
+    artifact <- list(id_usina = "BAUFI1", models = make_models_list(2L))
 
-test_that("validate_artifact accepts legacy format with lgr warning", {
-    legacy <- make_models_list(3L)
-    msgs <- capture_lgr_warns(validate_artifact(legacy))
-
-    expect_true(any(grepl("formato antigo", msgs)))
-})
-
-test_that("validate_artifact returns invisible TRUE for legacy format", {
-    legacy <- make_models_list(3L)
-    result <- capture_lgr_warns(validate_artifact(legacy))
-
-    expect_true(TRUE)
-    invisible_result <- validate_artifact(legacy)
-    expect_true(invisible_result)
-})
-
-test_that("validate_artifact treats plain model list as legacy not malformed", {
-    legacy <- make_models_list(5L)
-
-    expect_no_error(validate_artifact(legacy))
-    msgs <- capture_lgr_warns(validate_artifact(legacy))
-    expect_true(any(grepl("formato antigo", msgs)))
-})
-
-# TESTS FOR is_legacy_artifact -------------------------------------------------
-
-test_that("is_legacy_artifact returns TRUE for plain model list", {
-    plain <- make_models_list(2L)
-
-    expect_true(is_legacy_artifact(plain))
-})
-
-test_that("is_legacy_artifact returns FALSE for full envelope", {
-    artifact <- make_new_artifact()
-
-    expect_false(is_legacy_artifact(artifact))
-})
-
-test_that("is_legacy_artifact returns FALSE when any envelope key is present", {
-    with_id_only <- list(id_usina = "BAUFI1", x = 1L)
-    with_models_only <- list(models = make_models_list(1L), x = 1L)
-    with_metadata_only <- list(metadata = list(type = "x"), x = 1L)
-
-    expect_false(is_legacy_artifact(with_id_only))
-    expect_false(is_legacy_artifact(with_models_only))
-    expect_false(is_legacy_artifact(with_metadata_only))
-})
-
-test_that("is_legacy_artifact returns FALSE for partial envelope (id_usina + metadata)", {
-    partial <- list(id_usina = "BAUFI1", metadata = list(type = "x"))
-
-    expect_false(is_legacy_artifact(partial))
+    expect_error(validate_artifact(artifact), "Campo obrigatorio ausente")
+    err <- tryCatch(validate_artifact(artifact), error = function(e) conditionMessage(e))
+    expect_match(err, "metadata")
 })
 
 # TESTS FOR check_artifact_id_usina -------------------------------------------

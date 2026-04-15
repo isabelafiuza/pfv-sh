@@ -40,7 +40,7 @@ test_that("train_main writes provenance JSON with correct structure", {
     train_main(s$config)
 
     prov_files <- list.files(
-        s$temp_output,
+        s$temp_artifact,
         pattern = "^provenance-train-.*\\.json$",
         full.names = TRUE
     )
@@ -61,7 +61,7 @@ test_that("train_main writes metrics JSON with plant entries", {
     train_main(s$config)
 
     metrics_files <- list.files(
-        s$temp_output,
+        s$temp_artifact,
         pattern = "^metrics-train-.*\\.json$",
         full.names = TRUE
     )
@@ -80,7 +80,7 @@ test_that("train_main writes health JSON with overall_health field", {
     train_main(s$config)
 
     health_files <- list.files(
-        s$temp_output,
+        s$temp_artifact,
         pattern = "^health-train-.*\\.json$",
         full.names = TRUE
     )

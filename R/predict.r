@@ -72,7 +72,7 @@ predict_plant_wrapper <- function(
     file_name <- paste0(iu, "_modelos_ajustados")
     artifact <- pfvIO:::get_model_artifact(file_name, artifact_dir)
     validate_artifact(artifact)
-    models <- if (!is.null(artifact$models)) artifact$models else artifact
+    models <- artifact$models
     predict_usina(
         iu,
         dt_usinas = dt_usinas,

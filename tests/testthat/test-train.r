@@ -22,7 +22,7 @@ test_that("load_train_resume_state", {
 
     test_that("load_train_resume_state returns empty completed when no checkpoint", {
         tmp <- withr::local_tempdir()
-        cfg <- gen_config(ids_usinas = c("USI1", "USI2"), output = tmp)
+        cfg <- gen_config(ids_usinas = c("USI1", "USI2"), artifact = tmp)
         prov <- make_prov(c("USI1", "USI2"))
 
         result <- f(cfg, prov)
@@ -35,7 +35,7 @@ test_that("load_train_resume_state", {
     test_that("load_train_resume_state returns completed plants from checkpoint", {
         tmp <- withr::local_tempdir()
         ids <- c("USI1", "USI2", "USI3")
-        cfg <- gen_config(ids_usinas = ids, output = tmp)
+        cfg <- gen_config(ids_usinas = ids, artifact = tmp)
         prov <- create_provenance(cfg, "train", FALSE)
 
         update_plant_status(prov, "USI1", "completed")
@@ -51,7 +51,7 @@ test_that("load_train_resume_state", {
     test_that("load_train_resume_state updates provenance status for completed plants", {
         tmp <- withr::local_tempdir()
         ids <- c("USI1", "USI2")
-        cfg <- gen_config(ids_usinas = ids, output = tmp)
+        cfg <- gen_config(ids_usinas = ids, artifact = tmp)
         prov <- create_provenance(cfg, "train", FALSE)
 
         update_plant_status(prov, "USI1", "completed")
@@ -67,7 +67,7 @@ test_that("load_train_resume_state", {
     test_that("load_train_resume_state returns empty completed when all plants pending", {
         tmp <- withr::local_tempdir()
         ids <- c("USI1", "USI2")
-        cfg <- gen_config(ids_usinas = ids, output = tmp)
+        cfg <- gen_config(ids_usinas = ids, artifact = tmp)
         prov <- create_provenance(cfg, "train", FALSE)
 
         write_checkpoint(prov, tmp)
@@ -268,7 +268,7 @@ test_that("tally_train_results", {
         mockery::stub(f, "pfvIO:::write_model_artifact", function(...) invisible(NULL))
         f(models, "USI1", prov, metrics, lg, TRUE, cfg)
 
-        checkpoint_files <- list.files(tmp, pattern = "^checkpoint-.*\\.json$")
+        checkpoint_files <- list.files(artifact_dir, pattern = "^checkpoint-.*\\.json$")
         expect_length(checkpoint_files, 1L)
     })
 })

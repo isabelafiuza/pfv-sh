@@ -50,8 +50,8 @@ build_model_artifact <- function(id_usina, models, config) {
 
 #' Valida Artefato de Modelos
 #'
-#' Verifica estrutura de artefato de modelos. Artefatos antigos (lista plana)
-#' sao aceitos com aviso para compatibilidade retroativa.
+#' Verifica estrutura de artefato de modelos. O artefato deve conter os campos
+#' `id_usina`, `models` e `metadata`.
 #'
 #' @param artifact lista, artefato a ser validado
 #'
@@ -81,15 +81,10 @@ validate_artifact <- function(artifact) {
         stop("Artefato deve ser uma lista", call. = FALSE)
     }
 
-    if (is_legacy_artifact(artifact)) {
-        lg <- lgr::get_logger("pfvsh")
-        lg$warn("Artefato carregado em formato antigo (sem metadados)")
-        return(invisible(TRUE))
-    }
-
     errors <- character(0L)
     errors <- check_artifact_id_usina(errors, artifact)
     errors <- check_artifact_models(errors, artifact)
+    errors <- check_artifact_metadata(errors, artifact)
 
     if (length(errors) > 0L) {
         msg <- paste0(
@@ -99,13 +94,7 @@ validate_artifact <- function(artifact) {
         stop(msg, call. = FALSE)
     }
 
-    check_artifact_metadata(artifact)
-
     invisible(TRUE)
-}
-
-is_legacy_artifact <- function(artifact) {
-    !any(c("id_usina", "models", "metadata") %in% names(artifact))
 }
 
 #' @keywords internal
@@ -138,13 +127,9 @@ check_artifact_models <- function(errors, artifact) {
 }
 
 #' @keywords internal
-check_artifact_metadata <- function(artifact) {
+check_artifact_metadata <- function(errors, artifact) {
     if (!"metadata" %in% names(artifact)) {
-        lg <- lgr::get_logger("pfvsh")
-        lg$warn(
-            "Artefato para usina '%s' sem metadados (formato antigo)",
-            artifact$id_usina
-        )
+        return(c(errors, "Campo obrigatorio ausente: 'metadata'"))
     }
-    invisible(NULL)
+    errors
 }

@@ -13,9 +13,6 @@ combina_media <- function(dt){
                     percent = 0.1, ymax = valor_max_dia, span = 0.5),
                     by = .(id_usina, id_modelo_nwp, data_hora_rodada, dia_previsao)]
     
-    usinas <- unique(prev_combinada$id_usina)
-    lapply(usinas, plota_suavizacao, dt = prev_combinada)
-
     prev_combinada[, c("dia_previsao", "valor_max_dia", "valor") := NULL]
     setnames(prev_combinada, "valor_suavizado", "valor")
     setcolorder(prev_combinada, colorder)
@@ -34,46 +31,3 @@ suaviza_previsao <- function(y, x, percent, ymax, span){
     return(y_suavizado)
 }
 
-plota_suavizacao <- function(usina, dt){
-    dt_plot <- dt[id_usina == usina]
-    plota_suavizacao_usina(dt_plot)
-}
-plota_suavizacao_usina <- function(dt, diretorio_plot = "./plot") {
-    dt_plot <- copy(dt)
-    dt_plot_long <- melt(
-        dt_plot,
-        id.vars = "data_hora_previsao",
-        measure.vars = c("valor", "valor_suavizado"),
-        variable.name = "tipo",
-        value.name = "previsao"
-    )
-
-    gg <- ggplot2::ggplot(
-        dt_plot_long,
-        ggplot2::aes(
-            x = data_hora_previsao,
-            y = previsao,
-            group = tipo,
-            color = tipo
-        )
-    ) +
-        ggplot2::geom_line(alpha = 0.25, linewidth = 0.6) +
-        ggplot2::labs(
-            x = "Data hora",
-            y = "Geração prevista",
-            title = "Combinação e suavização da previsão"
-        ) +
-        ggplot2::theme_minimal(base_size = 12)
-
-    usina <- unique(dt_plot$id_usina)
-
-    if (!dir.exists(diretorio_plot)) {
-        dir.create(diretorio_plot, recursive = TRUE)
-    }
-    ggplot2::ggsave(
-        file.path(diretorio_plot, paste0("Combinacao_", usina, ".jpeg")),
-        plot = gg,
-        width = 15,
-        height = 10
-    )
-}

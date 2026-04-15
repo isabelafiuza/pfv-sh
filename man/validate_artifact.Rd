@@ -13,8 +13,8 @@ validate_artifact(artifact)
 \code{invisible(TRUE)} se valido; stop() caso contrario
 }
 \description{
-Verifica estrutura de artefato de modelos. Artefatos antigos (lista plana)
-sao aceitos com aviso para compatibilidade retroativa.
+Verifica estrutura de artefato de modelos. O artefato deve conter os campos
+\code{id_usina}, \code{models} e \code{metadata}.
 }
 \examples{
 cfg <- list(ids_usinas = "BAUFI1", horizonte_dias = 10L)

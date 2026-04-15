@@ -519,3 +519,20 @@ completa_datas <- function(dt, discretizacao) {
 
     return(dt)
 }
+
+#' Cria Dataset para Treinamento
+#'
+#' Carrega dados para treinamento dos modelos.
+#'
+#' @param args Lista com `ids_usinas` e `modelos_NWP`
+#' @param conn Conexao com banco de dados
+#'
+#' @return Lista com `ger_obs` e `irrad_prev`
+#'
+#' @keywords internal
+get_dataset <- function(args, conn) {
+    list(
+        ger_obs = get_geracao_observada(conn, id_usina = args$ids_usinas),
+        irrad_prev = get_irradiancia_prevista(conn, id_usina = args$ids_usinas, id_modelo_nwp = args$modelos_NWP)
+    )
+}
