@@ -7,12 +7,12 @@
 create_metrics(run_id, mode)
 }
 \arguments{
-\item{run_id}{character escalar, identificador da execucao}
+\item{run_id}{character, identificador da execucao}
 
-\item{mode}{character escalar, \code{"train"} ou \code{"predict"}}
+\item{mode}{character, \code{"train"} ou \code{"predict"}}
 }
 \value{
-environment com estrutura de metricas vazia
+environment
 }
 \description{
 Cria Registro de Metricas de Execucao

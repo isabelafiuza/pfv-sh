@@ -7,14 +7,14 @@
 write_metrics(metrics, output_dir)
 }
 \arguments{
-\item{metrics}{environment de metricas finalizado por \code{\link[=finalize_metrics]{finalize_metrics()}}}
+\item{metrics}{environment finalizado por \code{\link[=finalize_metrics]{finalize_metrics()}}}
 
 \item{output_dir}{character, diretorio de saida}
 }
 \value{
-caminho do arquivo escrito (invisivelmente)
+filepath (invisivelmente)
 }
 \description{
-Serializa as metricas como \verb{metrics-\{run_id\}.json} no diretorio informado.
-Falhas de I/O geram apenas aviso no log e nunca interrompem o pipeline.
+Serializa metricas como \verb{metrics-\{run_id\}.json}.
+Falhas de I/O geram aviso no log, sem interrupao do pipeline.
 }

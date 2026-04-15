@@ -7,30 +7,13 @@
 \method{parse_predict}{fisico_estimado}(modelo, ...)
 }
 \arguments{
-\item{modelo}{Lista contendo:
-\describe{
-\item{modelo_escolhido}{"RLS" ou "RLM"}
-\item{modelo_final}{Objeto lm ajustado}
-\item{variaveis_usadas}{Nomes das variaveis do modelo}
-}}
+\item{modelo}{list com \code{modelo_escolhido} ("RLS" ou "RLM"), \code{modelo_final}, \code{variaveis_usadas}}
 
-\item{...}{Argumentos adicionais:
-\describe{
-\item{pars}{Combinacao de parametros (NWP, horizonte, meia-hora)}
-\item{data_prev}{Vetor de datas-alvo}
-\item{ger_usi}{data.table com geracao observada}
-\item{prev_met_usi}{Lista de previsoes meteorologicas}
-\item{v_horizonte}{Vetor de horizontes}
-}}
+\item{...}{Argumentos: \code{pars}, \code{prev_met_usi}, \code{ger_usi}, \code{v_horizonte}, \code{data_prev}}
 }
 \value{
 Vetor numerico com valores previstos (MW)
 }
 \description{
-Gera previsoes usando modelo de regressao linear (RLS ou RLM)
-previamente treinado.
-}
-\details{
-O metodo aplica diretamente o modelo de regressao as variaveis
-meteorologicas previstas, sem necessidade de normalizacao.
+Gera previsoes usando modelo de regressao linear (RLS ou RLM).
 }

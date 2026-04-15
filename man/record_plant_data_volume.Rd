@@ -7,18 +7,18 @@
 record_plant_data_volume(metrics, id_usina, n_rows, n_na, n_total)
 }
 \arguments{
-\item{metrics}{environment de metricas criado por \code{\link[=create_metrics]{create_metrics()}}}
+\item{metrics}{environment criado por \code{\link[=create_metrics]{create_metrics()}}}
 
-\item{id_usina}{character escalar, identificador da usina}
+\item{id_usina}{character, identificador da usina}
 
-\item{n_rows}{numeric escalar, total de linhas processadas}
+\item{n_rows}{numeric, total de linhas processadas}
 
-\item{n_na}{numeric escalar, numero de valores \code{NA}}
+\item{n_na}{numeric, numero de valores \code{NA}}
 
-\item{n_total}{numeric escalar, denominador para calculo da taxa de NA}
+\item{n_total}{numeric, denominador para calculo da taxa de NA}
 }
 \value{
-invisivel, environment de metricas (mutado in-place)
+invisivel, metrics (mutado in-place)
 }
 \description{
 Registra Volume de Dados Processados de Uma Usina

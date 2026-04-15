@@ -7,13 +7,12 @@
 finalize_metrics(metrics)
 }
 \arguments{
-\item{metrics}{environment de metricas criado por \code{\link[=create_metrics]{create_metrics()}}}
+\item{metrics}{environment criado por \code{\link[=create_metrics]{create_metrics()}}}
 }
 \value{
-invisivel, environment de metricas (mutado in-place)
+invisivel, metrics (mutado in-place)
 }
 \description{
-Computa estatisticas agregadas das metricas por usina e preenche
-\code{metrics$pipeline}. Campos de duracao sao \code{NA_real_} quando nenhuma
-usina tem \code{duration_seconds} registrado.
+Computa estatisticas agregadas das metricas por usina e preenche \code{metrics$pipeline}.
+Campos de duracao sao \code{NA_real_} quando nenhuma usina tem \code{duration_seconds}.
 }

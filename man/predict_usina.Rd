@@ -13,30 +13,35 @@ predict_usina(
   v_horizonte,
   parametros_modelo_previsao,
   parametros_periodo_geracao,
-  local_modelo,
+  models,
   data_prev
 )
 }
 \arguments{
-\item{iu}{Identificador da usina (character)}
+\item{iu}{character, identificador da usina}
 
-\item{dt_usinas}{data.table com cadastro de usinas}
+\item{dt_usinas}{data.table, cadastro de usinas}
 
-\item{dt_ger_obs}{data.table com geracao observada}
+\item{dt_ger_obs}{data.table, geracao observada}
 
-\item{dt_prev}{Lista de data.tables com previsoes meteorologicas}
+\item{dt_prev}{list, previsoes meteorologicas}
 
-\item{parametros_modelo_previsao}{Lista com parametros dos modelos}
+\item{v_modelos_nwp}{character, modelos NWP}
 
-\item{parametros_periodo_geracao}{Parametros de identificacao do periodo solar}
+\item{v_horizonte}{character, horizontes}
 
-\item{data_prev}{Vetor de datas-alvo de previsao}
+\item{parametros_modelo_previsao}{list, parametros dos modelos}
+
+\item{parametros_periodo_geracao}{list, parametros do periodo solar}
+
+\item{models}{list, modelos ajustados}
+
+\item{data_prev}{Date, datas-alvo}
 }
 \value{
-Lista de previsoes, uma para cada combinacao de modelo treinado
+list de previsoes (uma por combinacao treinada)
 }
 \description{
-Executa o pipeline completo de previsao para uma usina especifica,
-usando artefatos de modelo previamente treinados.
+Executa previsao para uma usina especifica.
 }
 \keyword{internal}

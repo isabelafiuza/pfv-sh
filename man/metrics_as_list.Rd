@@ -10,9 +10,8 @@ metrics_as_list(metrics)
 \item{metrics}{environment de metricas}
 }
 \value{
-lista com todos os campos, \code{plants} tambem como lista
+lista com todos os campos serializados
 }
 \description{
-Serializa um registro de metricas (environment) para lista plain,
-adequado para conversao em JSON.
+Serializa metrics environment para lista, preparado para JSON.
 }

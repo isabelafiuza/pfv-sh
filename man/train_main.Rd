@@ -7,39 +7,33 @@
 train_main(args, parallel = FALSE, resume = FALSE)
 }
 \arguments{
-\item{args}{Lista de argumentos de configuracao contendo:
+\item{args}{lista com os seguintes campos:
 \describe{
-\item{input}{Caminho para diretorio de dados de entrada}
-\item{output}{Caminho para diretorio de saida dos artefatos}
-\item{ids_usinas}{Vetor de IDs das usinas a processar}
-\item{data_referencia}{Data de referencia para treinamento}
-\item{horizonte_dias}{Vetor de horizontes (e.g., c("D+0", "D+1"))}
-\item{modelos_NWP}{Vetor de modelos NWP a utilizar}
-\item{modelos_previsao}{Lista de configuracoes dos modelos de previsao}
-\item{parametros_periodo_geracao}{Parametros para identificacao de periodo solar}
+\item{\code{input}}{caminho para os dados de entrada}
+\item{\code{output}}{diretorio de saida para proveniencia e checkpoints}
+\item{\code{artifact}}{diretorio para artefatos de modelo}
+\item{\code{ids_usinas}}{character vector de IDs de usinas}
+\item{\code{data_referencia}}{character, data de corte no formato \code{"YYYY-MM-DD"}}
+\item{\code{horizonte_dias}}{integer, horizonte de previsao em dias}
+\item{\code{modelos_NWP}}{character vector, modelos NWP a usar}
+\item{\code{modelos_previsao}}{lista de configs por modelo}
+\item{\code{parametros_periodo_geracao}}{lista de parametros do periodo solar}
 }}
+
+\item{parallel}{logical, se \code{TRUE} processa usinas em paralelo via \code{future}}
+
+\item{resume}{logical, se \code{TRUE} retoma execucao a partir do ultimo checkpoint}
 }
 \value{
-Lista de artefatos de modelos treinados (invisivel). Os modelos tambem
-sao salvos em arquivos RDS no diretorio de saida.
+invisivel; modelos salvos em \verb{args$artifact/\{id_usina\}_modelos_ajustados.rds}
 }
 \description{
-Ponto de entrada principal para o treinamento de modelos de previsao de geracao
-solar fotovoltaica. Processa todas as usinas especificadas na configuracao.
+Treina modelos de previsao de geracao solar para todas as usinas.
+Registra proveniencia, metricas e relatorio de saude.
 }
 \details{
-O pipeline de treinamento executa os seguintes passos para cada usina:
-\enumerate{
-\item Carrega dados de geracao observada e previsoes meteorologicas
-\item Associa previsoes NWP as coordenadas da usina
-\item Interpola dados para resolucao semi-horaria
-\item Identifica periodos com geracao solar
-\item Gera combinacoes (NWP × horizonte × meia-hora × modelo)
-\item Treina modelo para cada combinacao
-\item Salva artefatos em \code{{output}/{id_usina}_modelos_ajustados.rds}
-}
-}
-\seealso{
-\code{\link{treina_usina}} para treinamento de uma usina especifica
-\code{\link{parse_train}} para dispatch de treinamento por tipo de modelo
+Quando \code{resume = TRUE}, carrega checkpoint existente em \code{args$output},
+salta usinas ja completadas e persiste o estado apos cada usina.
+Quando \code{parallel = TRUE}, usa \code{future.apply::future_lapply} para
+processar usinas em paralelo.
 }

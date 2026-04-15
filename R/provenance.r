@@ -287,3 +287,242 @@ plant_error <- function(id_usina, error) {
 is_plant_error <- function(x) {
     inherits(x, "plant_error")
 }
+
+#' Escreve Checkpoint de Execucao
+#'
+#' Persiste o estado atual da execucao em disco para permitir retomada em caso
+#' de falha. O arquivo e escrito como `checkpoint-{run_id}.json` no diretorio
+#' informado. Falhas de I/O geram apenas um aviso no log e nao interrompem o
+#' pipeline.
+#'
+#' @param provenance environment de proveniencia criado por [create_provenance()]
+#' @param output_dir character, diretorio onde o checkpoint sera gravado
+#'
+#' @return caminho do arquivo gravado (invisivelmente)
+#'
+#' @examples
+#' \dontrun{
+#' cfg <- list(ids_usinas = "USI1", data_referencia = "2025-07-01")
+#' prov <- create_provenance(cfg, "train", FALSE)
+#' write_checkpoint(prov, tempdir())
+#' }
+#'
+#' @export
+write_checkpoint <- function(provenance, output_dir) {
+    lg <- lgr::get_logger("pfvsh")
+    filename <- paste0("checkpoint-", provenance$run_id, ".json")
+    filepath <- file.path(output_dir, filename)
+
+    tryCatch({
+        if (!dir.exists(output_dir)) {
+            dir.create(output_dir, recursive = TRUE)
+        }
+        prov_json <- format_provenance_timestamps(prov_as_list(provenance))
+        json_str <- jsonlite::toJSON(
+            prov_json, pretty = TRUE, auto_unbox = TRUE, null = "null"
+        )
+        writeLines(json_str, filepath)
+    }, error = function(e) {
+        lg$warn("Falha ao escrever checkpoint: %s", conditionMessage(e))
+    })
+
+    invisible(filepath)
+}
+
+#' Le Checkpoint Valido do Diretorio
+#'
+#' Busca o checkpoint mais recente no diretorio e valida o hash da configuracao
+#' atual. Retorna `NULL` se nenhum checkpoint valido for encontrado, se o
+#' arquivo estiver corrompido ou se o hash divergir.
+#'
+#' @param output_dir character, diretorio onde procurar checkpoints
+#' @param config lista com a configuracao atual do pipeline
+#'
+#' @return lista de proveniencia do checkpoint, ou `NULL` se nenhum valido
+#'
+#' @examples
+#' \dontrun{
+#' cfg <- list(ids_usinas = "USI1", data_referencia = "2025-07-01")
+#' checkpoint <- read_checkpoint(tempdir(), cfg)
+#' }
+#'
+#' @export
+read_checkpoint <- function(output_dir, config) {
+    lg <- lgr::get_logger("pfvsh")
+
+    files <- list.files(
+        output_dir, pattern = "^checkpoint-.*\\.json$", full.names = TRUE
+    )
+
+    if (length(files) == 0L) return(NULL)
+
+    newest <- files[which.max(file.mtime(files))]
+
+    checkpoint <- tryCatch(
+        jsonlite::fromJSON(newest, simplifyVector = FALSE),
+        error = function(e) {
+            lg$warn(
+                "Checkpoint corrompido em '%s': %s",
+                newest, conditionMessage(e)
+            )
+            NULL
+        }
+    )
+
+    if (is.null(checkpoint)) return(NULL)
+
+    current_hash <- digest::digest(
+        normalize_config_for_hash(config),
+        algo = "sha256"
+    )
+
+    if (!identical(checkpoint$config_hash, current_hash)) {
+        lg$warn(
+            paste0(
+                "Checkpoint ignorado: hash da configuracao divergente ",
+                "(checkpoint: %s, atual: %s)"
+            ),
+            checkpoint$config_hash, current_hash
+        )
+        return(NULL)
+    }
+
+    lg$info("Checkpoint valido encontrado: %s", checkpoint$run_id)
+    checkpoint
+}
+
+#' Retorna Usinas Pendentes de um Checkpoint
+#'
+#' Filtra o campo `plant_status` do checkpoint e retorna os IDs das usinas
+#' cujo status nao seja `"completed"`.
+#'
+#' @param checkpoint lista de proveniencia lida por [read_checkpoint()]
+#'
+#' @return character vector com os IDs das usinas pendentes, ou `character(0)`
+#'   se todas estiverem completas
+#'
+#' @examples
+#' \dontrun{
+#' cfg <- list(ids_usinas = c("USI1", "USI2"), data_referencia = "2025-07-01")
+#' prov <- create_provenance(cfg, "train", FALSE)
+#' update_plant_status(prov, "USI1", "completed")
+#' cp <- read_checkpoint(tmpdir, cfg)
+#' get_pending_plants(cp)
+#' }
+#'
+#' @export
+get_pending_plants <- function(checkpoint) {
+    statuses <- checkpoint$plant_status
+    names(statuses)[vapply(statuses, function(s) s != "completed", logical(1L))]
+}
+
+#' Salva Resultado Intermediario de Uma Usina
+#'
+#' Grava o resultado de processamento de uma usina como arquivo RDS para
+#' permitir retomada. Falhas de I/O geram apenas um aviso no log e nao
+#' interrompem o pipeline.
+#'
+#' @param result lista com resultado da usina (retorno de `treina_usina()` ou
+#'   `predict_usina()`)
+#' @param id_usina character escalar, identificador da usina
+#' @param output_dir character, diretorio de saida
+#'
+#' @return caminho do arquivo gravado (invisivelmente)
+#'
+#' @keywords internal
+write_plant_result <- function(result, id_usina, output_dir) {
+    lg <- lgr::get_logger("pfvsh")
+    filepath <- file.path(output_dir, paste0("plant-result-", id_usina, ".rds"))
+
+    tryCatch(
+        saveRDS(result, filepath),
+        error = function(e) {
+            lg$warn(
+                "Falha ao salvar resultado da usina '%s': %s",
+                id_usina, conditionMessage(e)
+            )
+        }
+    )
+
+    invisible(filepath)
+}
+
+#' Le Resultado Intermediario de Uma Usina
+#'
+#' Carrega o resultado de processamento de uma usina previamente salvo por
+#' [write_plant_result()]. Retorna `NULL` se o arquivo nao existir ou estiver
+#' corrompido.
+#'
+#' @param id_usina character escalar, identificador da usina
+#' @param output_dir character, diretorio de saida
+#'
+#' @return lista com resultado da usina, ou `NULL`
+#'
+#' @keywords internal
+read_plant_result <- function(id_usina, output_dir) {
+    lg <- lgr::get_logger("pfvsh")
+    filepath <- file.path(output_dir, paste0("plant-result-", id_usina, ".rds"))
+
+    if (!file.exists(filepath)) return(NULL)
+
+    tryCatch(
+        readRDS(filepath),
+        error = function(e) {
+            lg$warn(
+                "Resultado intermediario corrompido para usina '%s': %s",
+                id_usina, conditionMessage(e)
+            )
+            NULL
+        }
+    )
+}
+
+#' Remove Arquivos de Checkpoint e Resultados Intermediarios
+#'
+#' Apaga o arquivo de checkpoint e todos os arquivos `plant-result-*.rds` do
+#' diretorio informado. Deve ser chamada apenas apos conclusao bem-sucedida do
+#' pipeline. Falhas de remocao geram aviso no log e nao propagam erro.
+#'
+#' @param output_dir character, diretorio de saida
+#' @param run_id character escalar ou `NULL`. Se fornecido, remove apenas o
+#'   checkpoint da execucao especificada; se `NULL`, remove todos os
+#'   checkpoints encontrados.
+#'
+#' @return `invisible(NULL)`
+#'
+#' @examples
+#' \dontrun{
+#' cleanup_checkpoint(tempdir(), run_id = "train-20250714-120000-ab12")
+#' cleanup_checkpoint(tempdir())
+#' }
+#'
+#' @export
+cleanup_checkpoint <- function(output_dir, run_id = NULL) {
+    lg <- lgr::get_logger("pfvsh")
+
+    cp_pattern <- if (!is.null(run_id)) {
+        paste0("^checkpoint-", run_id, "\\.json$")
+    } else {
+        "^checkpoint-.*\\.json$"
+    }
+
+    all_files <- c(
+        list.files(output_dir, pattern = cp_pattern, full.names = TRUE),
+        list.files(output_dir, pattern = "^plant-result-.*\\.rds$", full.names = TRUE)
+    )
+
+    if (length(all_files) > 0L) {
+        tryCatch(
+            file.remove(all_files),
+            error = function(e) {
+                lg$warn(
+                    "Falha ao remover arquivos de checkpoint: %s",
+                    conditionMessage(e)
+                )
+            }
+        )
+        lg$debug("Removidos %d arquivos de checkpoint/intermediarios", length(all_files))
+    }
+
+    invisible(NULL)
+}

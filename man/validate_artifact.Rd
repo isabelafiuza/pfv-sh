@@ -10,15 +10,11 @@ validate_artifact(artifact)
 \item{artifact}{lista, artefato a ser validado}
 }
 \value{
-\code{invisible(TRUE)} se o artefato e valido
+\code{invisible(TRUE)} se valido; stop() caso contrario
 }
 \description{
-Verifica a estrutura de um artefato de modelos. Artefatos no formato antigo
-(lista plana de pares \code{combinacao_ajuste} + \code{modelo}, sem envelope de
-metadados) sao aceitos com aviso via logger para compatibilidade retroativa.
-}
-\details{
-Todas as falhas sao coletadas antes de levantar uma unica excecao.
+Verifica estrutura de artefato de modelos. Artefatos antigos (lista plana)
+sao aceitos com aviso para compatibilidade retroativa.
 }
 \examples{
 cfg <- list(ids_usinas = "BAUFI1", horizonte_dias = 10L)

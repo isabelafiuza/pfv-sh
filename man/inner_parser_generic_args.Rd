@@ -7,7 +7,7 @@
 inner_parser_generic_args(parser)
 }
 \arguments{
-\item{parser}{Objeto ArgumentParser}
+\item{parser}{Objeto \code{ArgumentParser}}
 }
 \value{
 Parser com argumentos adicionados

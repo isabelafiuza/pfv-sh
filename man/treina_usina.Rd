@@ -14,46 +14,34 @@ treina_usina(
   v_modelos_previsao,
   parametros_modelo_previsao,
   parametros_periodo_geracao,
-  local_escrita,
   data_fim_treino
 )
 }
 \arguments{
-\item{iu}{Identificador da usina (character)}
+\item{iu}{character, identificador da usina}
 
-\item{dt_usinas}{data.table com cadastro de usinas}
+\item{dt_usinas}{data.table, cadastro de usinas}
 
-\item{dt_ger_obs}{data.table com geracao observada}
+\item{dt_ger_obs}{data.table, geracao observada}
 
-\item{dt_prev}{Lista de data.tables com previsoes meteorologicas}
+\item{dt_prev}{list de data.tables, previsoes meteorologicas}
 
-\item{v_modelos_nwp}{Vetor de modelos NWP a utilizar}
+\item{v_modelos_nwp}{character, modelos NWP}
 
-\item{v_horizonte}{Vetor de horizontes de previsao}
+\item{v_horizonte}{character, horizontes de previsao}
 
-\item{v_modelos_previsao}{Vetor de tipos de modelos de previsao}
+\item{v_modelos_previsao}{character, tipos de modelos}
 
-\item{parametros_modelo_previsao}{Lista com parametros de cada modelo}
+\item{parametros_modelo_previsao}{list, parametros por modelo}
 
-\item{parametros_periodo_geracao}{Lista com parametros de identificacao do periodo solar}
+\item{parametros_periodo_geracao}{list, parametros do periodo solar}
 
-\item{data_fim_treino}{Data limite para dados de treinamento}
+\item{data_fim_treino}{Date, limite para dados de treinamento}
 }
 \value{
-Salva artefatos RDS no diretorio de saida (efeito colateral)
+list de pares \code{combinacao_ajuste} + \code{modelo}
 }
 \description{
-Executa o pipeline completo de treinamento para uma usina especifica,
-gerando modelos para todas as combinacoes de NWP, horizonte e meia-hora.
-}
-\details{
-Esta funcao realiza:
-\enumerate{
-\item Filtragem de dados por usina
-\item Pre-processamento de dados NWP (associacao, interpolacao, preenchimento)
-\item Identificacao de meias-horas com geracao solar
-\item Geracao de todas as combinacoes para treinamento
-\item Treinamento paralelo de modelos via \code{lapply}
-}
+Treina modelos para todas as combinacoes NWP × horizonte × meia-hora × tipo.
 }
 \keyword{internal}

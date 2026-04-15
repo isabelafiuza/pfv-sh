@@ -7,7 +7,7 @@
 parse_predict(modelo, ...)
 }
 \arguments{
-\item{modelo}{Objeto do modelo treinado (com classe S3 definida)}
+\item{modelo}{Objeto do modelo treinado (com classe S3)}
 
 \item{...}{Argumentos adicionais passados aos metodos especificos}
 }
@@ -15,10 +15,5 @@ parse_predict(modelo, ...)
 Vetor numerico com valores previstos
 }
 \description{
-Funcao generica S3 que despacha para o metodo especifico de previsao
-baseado na classe do modelo.
-}
-\seealso{
-\code{\link{parse_predict.arimax}} para previsao ARIMAX
-\code{\link{parse_predict.fisico_estimado}} para previsao Fisico-Estimado
+Funcao generica S3 que despacha para metodo especifico de previsao.
 }

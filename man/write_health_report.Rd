@@ -12,9 +12,9 @@ write_health_report(report, output_dir)
 \item{output_dir}{character, diretorio de saida}
 }
 \value{
-caminho do arquivo escrito (invisivelmente)
+filepath (invisivelmente)
 }
 \description{
-Serializa o relatorio como \verb{health-\{run_id\}.json} no diretorio informado.
-Falhas de I/O geram apenas aviso no log e nunca interrompem o pipeline.
+Serializa relatorio como \verb{health-\{run_id\}.json}.
+Falhas de I/O geram aviso no log, sem interrupao do pipeline.
 }

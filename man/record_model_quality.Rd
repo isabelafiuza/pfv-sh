@@ -7,16 +7,15 @@
 record_model_quality(metrics, id_usina, metadata)
 }
 \arguments{
-\item{metrics}{environment de metricas criado por \code{\link[=create_metrics]{create_metrics()}}}
+\item{metrics}{environment criado por \code{\link[=create_metrics]{create_metrics()}}}
 
-\item{id_usina}{character escalar, identificador da usina}
+\item{id_usina}{character, identificador da usina}
 
-\item{metadata}{lista de metadados do artefato}
+\item{metadata}{lista com \code{n_combinacoes} e \code{n_modelos_validos}}
 }
 \value{
-invisivel, environment de metricas (mutado in-place)
+invisivel, metrics (mutado in-place)
 }
 \description{
-Extrai \code{n_combinacoes} e \code{n_modelos_validos} dos metadados do artefato e os
-adiciona ao registro da usina.
+Registra Qualidade do Modelo Ajustado para Uma Usina
 }

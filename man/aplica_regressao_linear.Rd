@@ -4,31 +4,19 @@
 \alias{aplica_regressao_linear}
 \title{Aplica Regressao Linear}
 \usage{
-aplica_regressao_linear(dt_y, dt_x, nlmod0)
+aplica_regressao_linear(dt_y, dt_x, nlmod0 = NULL)
 }
 \arguments{
-\item{dt_y}{data.table contendo a variavel resposta (e.g., geracao observada)}
+\item{dt_y}{data.table com variavel resposta}
 
-\item{dt_x}{data.table contendo a(s) variavel(is) explicativa(s)
-(e.g., irradiancia, umidade, temperatura). As observacoes devem estar
-alinhadas com \code{dt_y}.}
+\item{dt_x}{data.table com variaveis explicativas}
 
-\item{nlmod0}{Modelo de fallback retornado em caso de erro no ajuste.
-Se \code{NULL}, erro e propagado.}
+\item{nlmod0}{Modelo de fallback (retornado em caso de erro); opcional}
 }
 \value{
 Objeto \code{lm} com o modelo ajustado
 }
 \description{
-Ajusta um modelo de regressao linear a um conjunto de dados,
-com fallback para modelo dummy em caso de erro.
-}
-\examples{
-\dontrun{
-dt_y <- data.table(ger_obs = c(10, 20, 30))
-dt_x <- data.table(irrad = c(100, 200, 300))
-modelo <- aplica_regressao_linear(dt_y, dt_x)
-}
-
+Ajusta modelo de regressao linear com fallback em caso de erro.
 }
 \keyword{internal}

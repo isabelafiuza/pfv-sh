@@ -7,23 +7,14 @@
 get_dataset(args, conn)
 }
 \arguments{
-\item{args}{Lista de argumentos contendo:
-\describe{
-\item{ids_usinas}{Vetor de IDs das usinas}
-\item{modelos_NWP}{Vetor de modelos NWP a carregar}
-}}
+\item{args}{Lista com \code{ids_usinas} e \code{modelos_NWP}}
 
-\item{conn}{Objeto de conexao com banco de dados (via pfvIO)}
+\item{conn}{Conexao com banco de dados}
 }
 \value{
-Lista nomeada contendo:
-\describe{
-\item{ger_obs}{data.table com geracao observada}
-\item{irrad_prev}{data.table com irradiancia prevista}
-}
+Lista com \code{ger_obs} e \code{irrad_prev}
 }
 \description{
-Carrega e organiza os dados necessarios para treinamento dos modelos,
-incluindo geracao observada e previsoes meteorologicas.
+Carrega dados para treinamento dos modelos.
 }
 \keyword{internal}

@@ -12,8 +12,8 @@
 \item{...}{Argumentos adicionais (ignorados)}
 }
 \value{
-Gera erro indicando tipo de modelo desconhecido
+gera erro com tipo de modelo desconhecido
 }
 \description{
-Metodo default que gera erro para tipos de modelo nao suportados.
+Metodo Default para parse_predict
 }

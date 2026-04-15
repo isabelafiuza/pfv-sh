@@ -1,31 +1,32 @@
 #' Constroi Parser de Argumentos CLI
 #'
-#' Cria um ArgumentParser configurado com os argumentos suportados
+#' Cria um `ArgumentParser` configurado com os argumentos suportados
 #' pelo modelo de previsao solar fotovoltaica.
 #'
-#' @return Objeto \code{ArgumentParser} com argumentos configurados:
+#' @return `ArgumentParser` com argumentos configurados:
 #'   \describe{
-#'     \item{--datadir}{Diretorio de dados para execucao (default: "./data")}
+#'     \item{`--datadir`}{Diretorio de dados para execucao (default: `"./data"`)}
+#'     \item{`--parallel`}{Habilita processamento paralelo de usinas (flag booleana)}
+#'     \item{`--resume`}{Habilita retomada a partir do ultimo checkpoint (flag booleana)}
+#'     \item{`--workers`}{Numero de workers paralelos (inteiro, default: auto-detect)}
 #'   }
 #'
 #' @details
-#' O parser e usado pelo \code{main.r} para processar argumentos de linha
-#' de comando. O diretorio de dados deve conter:
-#' \itemize{
-#'   \item config.jsonc - Arquivo de configuracao
-#'   \item usinas.csv - Cadastro de usinas
-#'   \item geracao_observada.csv - Dados de geracao historica
-#'   \item irradiancia_prevista.csv - Previsoes NWP
-#' }
+#' O parser e usado pelo `cli_main()` para processar argumentos de linha de
+#' comando. O diretorio de dados deve conter:
+#' - `config.jsonc` -- arquivo de configuracao
+#' - `usinas.csv` -- cadastro de usinas
+#' - `geracao_observada.csv` -- dados de geracao historica
+#' - `irradiancia_prevista.csv` -- previsoes NWP
 #'
 #' @examples
 #' \dontrun{
 #' parser <- get_parser()
-#' args <- parser$parse_args()
-#' print(args$datadir)
+#' args <- parser$parse_args(c("--parallel", "--workers", "4"))
+#' print(args$parallel)
 #' }
 #'
-#' @seealso \code{\link[argparse]{ArgumentParser}}
+#' @seealso [cli_main()], [argparse::ArgumentParser()]
 #'
 #' @export
 get_parser <- function() {
@@ -41,18 +42,35 @@ get_parser <- function() {
 #'
 #' Funcao interna que configura os argumentos padrao do CLI.
 #'
-#' @param parser Objeto ArgumentParser
+#' @param parser Objeto `ArgumentParser`
 #'
 #' @return Parser com argumentos adicionados
 #'
 #' @keywords internal
 inner_parser_generic_args <- function(parser) {
-    help_msg <- paste0("Diretorio de dados para execucao do modelo de previsao -- Veja ",
-        "https://github.com/isabelafiuza/pfv-sh para detalhes")
+    help_msg <- paste0(
+        "Diretorio de dados para execucao do modelo de previsao -- Veja ",
+        "https://github.com/isabelafiuza/pfv-sh para detalhes"
+    )
     parser$add_argument("--datadir",
         type = "character",
         default = "./data",
         help = help_msg
+    )
+    parser$add_argument("--parallel",
+        action = "store_true",
+        default = FALSE,
+        help = "Habilita processamento paralelo de usinas"
+    )
+    parser$add_argument("--resume",
+        action = "store_true",
+        default = FALSE,
+        help = "Habilita retomada do pipeline a partir do ultimo checkpoint"
+    )
+    parser$add_argument("--workers",
+        type = "integer",
+        default = NULL,
+        help = "Numero de workers paralelos (padrao: auto-detect via availableCores() - 1)"
     )
 
     return(parser)

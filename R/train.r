@@ -1,14 +1,155 @@
+#' Carrega Estado de Retomada do Treinamento
+#'
+#' Le o checkpoint de treinamento e identifica usinas ja completadas para
+#' permitir retomada do pipeline. Retorna `completed = character(0L)` se
+#' nenhum checkpoint valido for encontrado.
+#'
+#' @param args lista de argumentos do pipeline (deve conter `output` e `ids_usinas`)
+#' @param provenance environment de proveniencia criado por [create_provenance()]
+#'
+#' @return lista com `provenance` (atualizado) e `completed` (character vector
+#'     de IDs de usinas ja processadas)
+#'
+#' @seealso [read_checkpoint()], [get_pending_plants()]
+#'
+#' @export
+load_train_resume_state <- function(args, provenance) {
+    checkpoint <- read_checkpoint(args$output, args)
+    if (is.null(checkpoint)) {
+        return(list(provenance = provenance, completed = character(0L)))
+    }
+    completed_plants <- setdiff(args$ids_usinas, get_pending_plants(checkpoint))
+    for (iu in completed_plants) {
+        update_plant_status(provenance, iu, "completed")
+    }
+    list(provenance = provenance, completed = completed_plants)
+}
+
+#' Despacha Processamento de Usinas (Sequencial ou Paralelo)
+#'
+#' Itera sobre `v_usinas` chamando `fn` via `do.call`, com isolamento de erro
+#' por usina via `plant_error`. No modo sequencial, o tempo por usina e medido
+#' individualmente. No modo paralelo, o tempo total do lote e distribuido
+#' igualmente.
+#'
+#' @param v_usinas character vector de IDs de usinas a processar
+#' @param fn funcao worker a chamar para cada usina; assinatura
+#'     `fn(iu, ...)` onde `...` sao os campos de `extra_args`
+#' @param extra_args lista nomeada de argumentos adicionais a passar para `fn`
+#' @param parallel logical, se `TRUE` usa `future.apply::future_lapply`
+#' @param metrics objeto de metricas criado por [create_metrics()]
+#' @param lg objeto logger
+#'
+#' @return lista com os resultados por usina (na ordem de `v_usinas`);
+#'     erros sao encapsulados como objetos `plant_error`
+#'
+#' @export
+run_plants <- function(v_usinas, fn, extra_args, parallel, metrics, lg) {
+    if (parallel) {
+        per_plant_args <- split_args_by_plant(extra_args, v_usinas)
+        batch_start <- proc.time()[["elapsed"]]
+        .fn <- fn
+        .plant_error <- plant_error
+        results <- future.apply::future_lapply(
+            per_plant_args,
+            function(plant_args) {
+                iu <- plant_args$.iu
+                plant_args$.iu <- NULL
+                tryCatch(
+                    do.call(.fn, c(list(iu), plant_args)),
+                    error = function(e) .plant_error(iu, e)
+                )
+            },
+            future.seed = TRUE,
+            future.globals = list(.fn = .fn, .plant_error = .plant_error)
+        )
+        batch_elapsed <- proc.time()[["elapsed"]] - batch_start
+        est_per_plant <- round(batch_elapsed / length(v_usinas), 2L)
+        for (iu in v_usinas) record_plant_timing(metrics, iu, est_per_plant)
+    } else {
+        results <- lapply(v_usinas, function(iu) {
+            t0 <- proc.time()[["elapsed"]]
+            result <- tryCatch(
+                do.call(fn, c(list(iu), extra_args)),
+                error = function(e) {
+                    lg$warn("Falha na usina %s: %s", iu, conditionMessage(e))
+                    plant_error(iu, e)
+                }
+            )
+            record_plant_timing(metrics, iu, round(proc.time()[["elapsed"]] - t0, 2L))
+            result
+        })
+    }
+    results
+}
+
+#' Processa Resultados de Treinamento por Usina
+#'
+#' Itera sobre os resultados de `run_plants`, atualiza status de proveniencia,
+#' registra qualidade do modelo, escreve artefato enriquecido e, quando
+#' `resume = TRUE`, persiste checkpoint apos cada usina.
+#'
+#' @param models lista de resultados de `run_plants` (um por usina)
+#' @param v_usinas character vector de IDs de usinas, na mesma ordem que `models`
+#' @param provenance environment de proveniencia criado por [create_provenance()]
+#' @param metrics objeto de metricas criado por [create_metrics()]
+#' @param lg objeto logger
+#' @param resume logical, se `TRUE` chama [write_checkpoint()] apos cada usina
+#' @param args lista com `output` (dir de checkpoint) e `artifact` (dir de artefatos)
+#'     e demais campos necessarios para [build_model_artifact()]
+#'
+#' @return inteiro com o numero de usinas que falharam
+#'
+#' @keywords internal
+tally_train_results <- function(models, v_usinas, provenance, metrics, lg, resume, args) {
+    n_failed <- 0L
+    n_total <- length(v_usinas)
+    for (i in seq_along(v_usinas)) {
+        iu <- v_usinas[i]
+        result <- models[[i]]
+        if (is_plant_error(result)) {
+            update_plant_status(provenance, iu, "failed")
+            n_failed <- n_failed + 1L
+            lg$error("Usina %s falhou: %s", iu, result$error)
+        } else {
+            update_plant_status(provenance, iu, "completed")
+            enriched <- build_model_artifact(iu, result, args)
+            record_model_quality(metrics, iu, enriched$metadata)
+            file_name <- paste0(iu, "_modelos_ajustados")
+            pfvIO:::write_model_artifact(enriched, file_name, args$artifact)
+        }
+        if (resume) write_checkpoint(provenance, args$output)
+        lg$info("Usina %s processada (%d/%d)", iu, i, n_total)
+    }
+    n_failed
+}
+
 #' Executa Pipeline de Treinamento
 #'
 #' Treina modelos de previsao de geracao solar para todas as usinas.
 #' Registra proveniencia, metricas e relatorio de saude.
 #'
-#' @param args Lista com `input`, `output`, `ids_usinas`, `data_referencia`, `horizonte_dias`,
-#'   `modelos_NWP`, `modelos_previsao`, `parametros_periodo_geracao`
-#' @param parallel logical (não implementado ainda)
-#' @param resume logical (não implementado ainda)
+#' Quando `resume = TRUE`, carrega checkpoint existente em `args$output`,
+#' salta usinas ja completadas e persiste o estado apos cada usina.
+#' Quando `parallel = TRUE`, usa `future.apply::future_lapply` para
+#' processar usinas em paralelo.
 #'
-#' @return invisivel; modelos salvos em `output/{id_usina}_modelos_ajustados.rds`
+#' @param args lista com os seguintes campos:
+#' \describe{
+#'   \item{`input`}{caminho para os dados de entrada}
+#'   \item{`output`}{diretorio de saida para proveniencia e checkpoints}
+#'   \item{`artifact`}{diretorio para artefatos de modelo}
+#'   \item{`ids_usinas`}{character vector de IDs de usinas}
+#'   \item{`data_referencia`}{character, data de corte no formato `"YYYY-MM-DD"`}
+#'   \item{`horizonte_dias`}{integer, horizonte de previsao em dias}
+#'   \item{`modelos_NWP`}{character vector, modelos NWP a usar}
+#'   \item{`modelos_previsao`}{lista de configs por modelo}
+#'   \item{`parametros_periodo_geracao`}{lista de parametros do periodo solar}
+#' }
+#' @param parallel logical, se `TRUE` processa usinas em paralelo via `future`
+#' @param resume logical, se `TRUE` retoma execucao a partir do ultimo checkpoint
+#'
+#' @return invisivel; modelos salvos em `args$artifact/{id_usina}_modelos_ajustados.rds`
 #'
 #' @export
 train_main <- function(args, parallel = FALSE, resume = FALSE) {
@@ -16,6 +157,13 @@ train_main <- function(args, parallel = FALSE, resume = FALSE) {
     metrics <- create_metrics(provenance$run_id, "train")
     set_log_context(provenance$run_id, "train")
     lg <- get_pkg_logger()
+    completed_plants <- character(0L)
+
+    if (resume) {
+        state <- load_train_resume_state(args, provenance)
+        provenance <- state$provenance
+        completed_plants <- state$completed
+    }
 
     on.exit({
         if (provenance$status == "running") {
@@ -29,64 +177,51 @@ train_main <- function(args, parallel = FALSE, resume = FALSE) {
         clear_log_context()
     }, add = TRUE)
 
+    v_usinas <- setdiff(args$ids_usinas, completed_plants)
+
+    if (length(v_usinas) == 0L) {
+        finalize_provenance(provenance, "completed")
+        cleanup_checkpoint(args$output)
+        return(invisible(NULL))
+    }
+
     conn <- conectamock_pfv(args$input)
 
     data_fim_treino <- as.Date(args$data_referencia)
-
-    v_usinas <- args$ids_usinas
     v_horizonte <- args$horizonte_dias
     v_modelos_nwp <- args$modelos_NWP
     v_modelos_previsao <- vapply(args$modelos_previsao, function(x) x$tipo, character(1L))
 
-    dt_usinas <- get_usinas(conn, id_usina = v_usinas)
+    dt_usinas <- get_usinas(conn, id_usina = args$ids_usinas)
 
     data_set <- get_dataset(args, conn)
     data_set_ger <- data_set$ger_obs
     data_set_met <- data_set[names(data_set) != "ger_obs"]
 
-    artefatos <- lapply(v_usinas, function(iu) {
-        lg$info("Processando usina: %s", iu)
-        t0 <- proc.time()["elapsed"]
-        result <- tryCatch(
-            treina_usina(iu,
-                dt_usinas = dt_usinas,
-                dt_ger_obs = data_set_ger,
-                dt_prev = data_set_met,
-                v_modelos_nwp = v_modelos_nwp,
-                v_horizonte = v_horizonte,
-                v_modelos_previsao = v_modelos_previsao,
-                parametros_modelo_previsao = args$modelos_previsao,
-                parametros_periodo_geracao = args$parametros_periodo_geracao,
-                data_fim_treino = data_fim_treino
-            ),
-            error = function(e) {
-                lg$warn("Falha na usina %s: %s", iu, conditionMessage(e))
-                plant_error(iu, e)
-            }
-        )
-        duration <- proc.time()["elapsed"] - t0
-        record_plant_timing(metrics, iu, duration)
+    extra_args <- list(
+        dt_usinas = dt_usinas,
+        dt_ger_obs = data_set_ger,
+        dt_prev = data_set_met,
+        v_modelos_nwp = v_modelos_nwp,
+        v_horizonte = v_horizonte,
+        v_modelos_previsao = v_modelos_previsao,
+        parametros_modelo_previsao = args$modelos_previsao,
+        parametros_periodo_geracao = args$parametros_periodo_geracao,
+        data_fim_treino = data_fim_treino
+    )
 
-        if (is_plant_error(result)) {
-            update_plant_status(provenance, iu, "failed")
-        } else {
-            update_plant_status(provenance, iu, "completed")
-            quality <- list(
-                n_combinacoes = length(result),
-                n_modelos_validos = count_valid_models(result)
-            )
-            record_model_quality(metrics, iu, quality)
-            enriched <- build_model_artifact(iu, result, args)
-            file_name <- paste0(iu, "_modelos_ajustados")
-            pfvIO:::write_model_artifact(enriched, file_name, args$artifact)
-        }
+    if (parallel) {
+        old_plan <- setup_parallel_plan()
+        on.exit(reset_parallel_plan(old_plan), add = TRUE)
+    }
 
-        result
-    })
+    models <- run_plants(v_usinas, treina_usina, extra_args, parallel, metrics, lg)
 
-    n_failed <- sum(vapply(artefatos, is_plant_error, logical(1L)))
+    n_failed <- tally_train_results(models, v_usinas, provenance, metrics, lg, resume, args)
+
     final_status <- if (n_failed == length(v_usinas)) "failed" else "completed"
     finalize_provenance(provenance, final_status)
+    if (resume) cleanup_checkpoint(args$output)
 }
 
 #' Treina Modelos para Uma Usina

@@ -7,26 +7,18 @@
 build_model_artifact(id_usina, models, config)
 }
 \arguments{
-\item{id_usina}{character escalar, identificador da usina}
+\item{id_usina}{character, identificador da usina}
 
-\item{models}{lista de pares \code{combinacao_ajuste} + \code{modelo} retornada por
-\code{\link[=treina_usina]{treina_usina()}}}
+\item{models}{lista de pares \code{combinacao_ajuste} + \code{modelo} de \code{\link[=treina_usina]{treina_usina()}}}
 
-\item{config}{lista com a configuracao de treinamento}
+\item{config}{lista com configuracao de treinamento}
 }
 \value{
-lista com tres elementos:
-\describe{
-\item{\code{id_usina}}{character com o identificador da usina}
-\item{\code{models}}{lista de pares \code{combinacao_ajuste} + \code{modelo} sem alteracoes}
-\item{\code{metadata}}{lista com metadados: tipo, contagens, timestamp, versao e hash}
-}
+lista com \code{id_usina}, \code{models}, e \code{metadata} (tipo, contagens, timestamps, hash)
 }
 \description{
-Monta o artefato completo contendo todos os modelos ajustados da usina e
-metadados de proveniencia. Diferentemente do modelo singular de \code{mh-pfv},
-cada usina em \code{pfv-sh} possui N modelos -- um por combinacao de NWP x
-horizonte x meia-hora x tipo de modelo.
+Monta artefato com modelos ajustados da usina e metadados de proveniencia.
+Cada usina possui N modelos — um por combinacao NWP × horizonte × meia-hora × tipo.
 }
 \examples{
 cfg <- list(

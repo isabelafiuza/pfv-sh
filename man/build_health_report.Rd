@@ -7,16 +7,14 @@
 build_health_report(provenance, metrics = NULL)
 }
 \arguments{
-\item{provenance}{lista de proveniencia finalizada por \code{\link[=finalize_provenance]{finalize_provenance()}}}
+\item{provenance}{environment/lista de proveniencia}
 
-\item{metrics}{lista de metricas finalizada por \code{\link[=finalize_metrics]{finalize_metrics()}}, ou \code{NULL}}
+\item{metrics}{lista de metricas, ou \code{NULL}}
 }
 \value{
-lista com \code{run_id}, \code{mode}, \code{created_at}, \code{overall_health},
-\code{summary}, \code{plants}, \code{warnings} e \code{errors}
+lista com saude do pipeline e relatorio por usina
 }
 \description{
-Agrega dados de proveniencia e metricas em um relatorio estruturado com
-classificacao de saude por usina e do pipeline. Registra aviso se a
-proveniencia ainda estiver com status \code{"running"}.
+Agrega proveniencia e metricas em relatorio com classificacao de saude.
+Registra aviso se proveniencia nao estiver finalizada.
 }

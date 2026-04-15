@@ -7,33 +7,36 @@
 get_parser()
 }
 \value{
-Objeto \code{ArgumentParser} com argumentos configurados:
+\code{ArgumentParser} com argumentos configurados:
 \describe{
-\item{--datadir}{Diretorio de dados para execucao (default: "./data")}
+\item{\code{--datadir}}{Diretorio de dados para execucao (default: \code{"./data"})}
+\item{\code{--parallel}}{Habilita processamento paralelo de usinas (flag booleana)}
+\item{\code{--resume}}{Habilita retomada a partir do ultimo checkpoint (flag booleana)}
+\item{\code{--workers}}{Numero de workers paralelos (inteiro, default: auto-detect)}
 }
 }
 \description{
-Cria um ArgumentParser configurado com os argumentos suportados
+Cria um \code{ArgumentParser} configurado com os argumentos suportados
 pelo modelo de previsao solar fotovoltaica.
 }
 \details{
-O parser e usado pelo \code{main.r} para processar argumentos de linha
-de comando. O diretorio de dados deve conter:
+O parser e usado pelo \code{cli_main()} para processar argumentos de linha de
+comando. O diretorio de dados deve conter:
 \itemize{
-\item config.jsonc - Arquivo de configuracao
-\item usinas.csv - Cadastro de usinas
-\item geracao_observada.csv - Dados de geracao historica
-\item irradiancia_prevista.csv - Previsoes NWP
+\item \code{config.jsonc} -- arquivo de configuracao
+\item \code{usinas.csv} -- cadastro de usinas
+\item \code{geracao_observada.csv} -- dados de geracao historica
+\item \code{irradiancia_prevista.csv} -- previsoes NWP
 }
 }
 \examples{
 \dontrun{
 parser <- get_parser()
-args <- parser$parse_args()
-print(args$datadir)
+args <- parser$parse_args(c("--parallel", "--workers", "4"))
+print(args$parallel)
 }
 
 }
 \seealso{
-\code{\link[argparse]{ArgumentParser}}
+\code{\link[=cli_main]{cli_main()}}, \code{\link[argparse:ArgumentParser]{argparse::ArgumentParser()}}
 }
