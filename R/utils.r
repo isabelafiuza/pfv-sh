@@ -496,6 +496,7 @@ monta_dt_prev <- function(prev_usina_elem, id_usina, data_referencia) {
 #'     \item{id_usina}{}
 #'     \item{id_modelo_nwp}{}
 #'     \item{data_hora_rodada}{}
+#'   }
 #' @param discretizacao Intervalo de tempo para a sequencia (e.g., "30 min", "1 hour")
 #'
 #' @return data.table com colunas de \code{data_hora_previsao}
@@ -512,9 +513,9 @@ completa_datas <- function(dt, discretizacao) {
         by = .(id_modelo_prev, id_modelo_nwp, id_usina, data_hora_rodada)
     ]
 
-    dt_final <- merge(dt_final, dt_sequencia_datas, 
-                        by = c("id_modelo_prev", "id_modelo_nwp", "id_usina", "data_hora_rodada", "data_hora_previsao"),
-                        all.y = TRUE)
+    dt <- merge(dt, dt_sequencia_datas,
+                 by = c("id_modelo_prev", "id_modelo_nwp", "id_usina", "data_hora_rodada", "data_hora_previsao"),
+                 all.y = TRUE)
 
-    return(dt_final)
+    return(dt)
 }

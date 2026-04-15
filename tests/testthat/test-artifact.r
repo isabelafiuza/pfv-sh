@@ -1,12 +1,3 @@
-capture_lgr_warns <- function(expr) {
-    lg <- lgr::get_logger("pfvsh")
-    buf <- lgr::AppenderBuffer$new()
-    lg$add_appender(buf, name = "test_capture")
-    on.exit(lg$remove_appender("test_capture"), add = TRUE)
-    force(expr)
-    buf$buffer_dt$msg
-}
-
 make_model_entry <- function(escolhido = "arimax") {
     list(
         combinacao_ajuste = list(

@@ -2,7 +2,7 @@ get_ctx_filter_name <- function() "pfvsh_ctx"
 
 configure_json_logging <- function(lg) {
     fmt <- Sys.getenv("PFVSH_LOG_FORMAT", unset = "")
-    if (tolower(trimws(fmt)) != "json") return()
+    if (tolower(trimws(fmt)) != "json") return(invisible(NULL))
 
     tryCatch({
         lg$appenders$console$set_layout(LayoutJson$new())
@@ -12,6 +12,8 @@ configure_json_logging <- function(lg) {
             call. = FALSE
         )
     })
+
+    invisible(NULL)
 }
 
 logger_setup <- function() {
@@ -66,6 +68,8 @@ set_log_context <- function(run_id, mode, stage = NULL) {
 
     fi <- do.call(lgr::FilterInject$new, fields)
     lg$add_filter(fi, name = ctx_name)
+
+    invisible(NULL)
 }
 
 #' Remove Contexto Estruturado do Logger

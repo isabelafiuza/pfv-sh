@@ -7,6 +7,14 @@
 completa_datas(dt, discretizacao)
 }
 \arguments{
+\item{dt}{data.table com colunas:
+\describe{
+\item{id_modelo_prev}{}
+\item{id_usina}{}
+\item{id_modelo_nwp}{}
+\item{data_hora_rodada}{}
+}}
+
 \item{discretizacao}{Intervalo de tempo para a sequencia (e.g., "30 min", "1 hour")}
 }
 \value{

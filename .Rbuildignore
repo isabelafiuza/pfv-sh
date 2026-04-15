@@ -15,3 +15,9 @@
 ^CONTRIBUTING.md$
 ^auxiliar$
 ^out$
+^codecov\.yml$
+^tests/coverage-baseline\.md$
+^plans$
+^dev\.r$
+^\.claude$
+^MLOPS_OVERHAUL_REPORT\.md$

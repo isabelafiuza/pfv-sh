@@ -21,6 +21,8 @@ testthat/
 .lintr
 .github/
 DOC-DIRECTIVES.md
+plans/
+.claude/
 
 # Output directories (will be mounted)
 out/
