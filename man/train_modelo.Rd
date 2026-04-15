@@ -7,31 +7,20 @@
 train_modelo(l, ger_usi, prev_met_usi, param_modelo_previsao, data_fim_treino)
 }
 \arguments{
-\item{l}{Lista contendo a combinacao de parametros:
-\describe{
-\item{id_modelo_nwp}{Identificador do modelo NWP}
-\item{horiz_prev}{Horizonte de previsao (e.g., "D+0")}
-\item{hora_min}{Meia-hora no formato "HH:MM"}
-\item{modelo_prev}{Tipo de modelo de previsao}
-}}
+\item{l}{list com \code{id_modelo_nwp}, \code{horiz_prev}, \code{hora_min}, \code{modelo_prev}}
 
-\item{ger_usi}{data.table com geracao observada da usina}
+\item{ger_usi}{data.table, geracao observada}
 
-\item{prev_met_usi}{Lista de data.tables com previsoes meteorologicas}
+\item{prev_met_usi}{list, previsoes meteorologicas}
 
-\item{param_modelo_previsao}{Lista com parametros dos modelos}
+\item{param_modelo_previsao}{list, parametros do modelo}
 
-\item{data_fim_treino}{Data limite para dados de treinamento}
+\item{data_fim_treino}{Date, limite para treinamento}
 }
 \value{
-Lista contendo:
-\describe{
-\item{combinacao_ajuste}{Parametros da combinacao}
-\item{modelo}{Objeto do modelo ajustado}
-}
+list com \code{combinacao_ajuste} e \code{modelo} ajustado
 }
 \description{
-Treina um modelo de previsao para uma combinacao especifica de
-NWP, horizonte, meia-hora e tipo de modelo.
+Treina um modelo para uma combinacao especifica.
 }
 \keyword{internal}

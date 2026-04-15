@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main, develop]
 
+permissions: read-all
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lint:
     runs-on: ubuntu-latest
@@ -28,15 +34,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libcurl4-openssl-dev libssl-dev libxml2-dev
 
-      - name: Install remotes
-        run: |
-          install.packages("remotes", "cyclocomp")
-        shell: Rscript {0}
-
-      - name: Install lintr
-        run: |
-          remotes::install_version("lintr", version = "3.2.0")
-        shell: Rscript {0}
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: any::lintr, any::cyclocomp
+          needs: lint
 
       - name: Run lintr
         run: |

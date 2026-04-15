@@ -4,46 +4,33 @@
 \alias{predict_main}
 \title{Executa Pipeline de Previsao}
 \usage{
-predict_main(args)
+predict_main(args, parallel = FALSE, resume = FALSE)
 }
 \arguments{
-\item{args}{Lista de argumentos de configuracao contendo:
-\describe{
-\item{input}{Caminho para diretorio de dados de entrada}
-\item{output}{Caminho para diretorio com artefatos de modelo}
-\item{ids_usinas}{Vetor de IDs das usinas a processar}
-\item{data_referencia}{Data de referencia para previsao}
-\item{horizonte_dias}{Vetor de horizontes (e.g., c("D+0", "D+1"))}
-\item{modelos_previsao}{Lista de configuracoes dos modelos}
-\item{parametros_periodo_geracao}{Parametros de periodo solar}
-}}
+\item{args}{Lista com \code{input}, \code{output}, \code{ids_usinas}, \code{data_referencia},
+\code{horizonte_dias}, \code{modelos_NWP}, \code{modelos_previsao},
+\code{parametros_periodo_geracao}}
+
+\item{parallel}{logical, se \code{TRUE} processa usinas em paralelo via
+\code{future}}
+
+\item{resume}{logical, se \code{TRUE} retoma execucao a partir do ultimo
+checkpoint valido}
 }
 \value{
-data.table com previsoes contendo colunas:
-\describe{
-\item{id_usina}{Identificador da usina}
-\item{id_modelo_prev}{Tipo do modelo de previsao}
-\item{id_modelo_nwp}{Modelo NWP utilizado}
-\item{data_hora_rodada}{Data/hora da rodada}
-\item{data_hora_previsao}{Data/hora da previsao}
-\item{valor}{Geracao prevista (MW)}
-}
+data.table com previsoes (colunas: id_usina, id_modelo_prev,
+id_modelo_nwp, data_hora_rodada, data_hora_previsao, valor);
+tambem salvo em \code{output/previsao_geracao_fotovoltaica.parquet}
 }
 \description{
-Ponto de entrada principal para geracao de previsoes de geracao solar
-fotovoltaica usando modelos pre-treinados.
+Gera previsoes de geracao solar usando modelos pre-treinados.
+Registra proveniencia, metricas e relatorio de saude.
 }
 \details{
-O pipeline de previsao executa os seguintes passos para cada usina:
-\enumerate{
-\item Carrega artefatos de modelo treinado
-\item Prepara dados NWP para o horizonte de previsao
-\item Recalibra modelos com dados mais recentes
-\item Gera previsoes para todas as combinacoes
-\item Consolida resultados em data.table final
-}
-}
-\seealso{
-\code{\link{predict_usina}} para previsao de uma usina especifica
-\code{\link{parse_predict}} para dispatch de previsao por tipo de modelo
+Quando \code{resume = TRUE}, carrega checkpoint existente em \code{args$output},
+salta usinas ja completadas cujo resultado intermediario existe em disco,
+persiste o estado apos cada usina e consolida todos os resultados
+(retomados + novos) na saida final.
+Quando \code{parallel = TRUE}, usa \code{future.apply::future_lapply} para
+processar usinas em paralelo.
 }

@@ -7,22 +7,14 @@
 cria_dt_auxiliar(dif, dt_completo)
 }
 \arguments{
-\item{dif}{data.table com uma linha contendo:
-\describe{
-\item{id_modelo_nwp}{Modelo NWP}
-\item{id_usina}{Usina}
-\item{data_hora_rodada}{Data da rodada ausente}
-\item{passos_inicio}{Offset inicial das previsoes}
-\item{passos_fim}{Offset final das previsoes}
-}}
+\item{dif}{data.table com uma linha (info sobre rodada ausente)}
 
-\item{dt_completo}{data.table de referencia para obter latitude/longitude}
+\item{dt_completo}{data.table de referencia (latitude/longitude)}
 }
 \value{
-data.table com estrutura identica as previsoes, valores = NA
+data.table com estrutura identica, valores = NA
 }
 \description{
-Funcao auxiliar de \code{preenche_ausencia_previsao} que gera um data.table
-com previsoes NA para uma data de rodada ausente.
+Auxiliar para \code{preenche_ausencia_previsao}.
 }
 \keyword{internal}

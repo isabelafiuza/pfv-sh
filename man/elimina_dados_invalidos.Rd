@@ -7,18 +7,12 @@
 elimina_dados_invalidos(dt)
 }
 \arguments{
-\item{dt}{data.table com series temporais (deve conter coluna \code{data_hora})}
+\item{dt}{data.table com series temporais}
 }
 \value{
-data.table filtrado apenas com registros completos
+data.table apenas com registros completos
 }
 \description{
-Remove registros com valores invalidos (999 ou NA) das series temporais.
-Valores 999 sao primeiro convertidos para NA, depois registros incompletos
-sao removidos.
-}
-\details{
-O valor 999 e tratado como codigo de dado faltante em alguns sistemas
-meteorologicos. A funcao converte esses valores para NA antes de filtrar.
+Remove registros com valores 999 ou NA (conversion, then filtering).
 }
 \keyword{internal}

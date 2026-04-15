@@ -7,23 +7,14 @@
 recalibra_arimax(dt, nlmod0)
 }
 \arguments{
-\item{dt}{data.table com colunas \code{ger_obs_norm} e variaveis exogenas
-normalizadas (sufixo \code{_norm})}
+\item{dt}{data.table com \code{ger_obs_norm} e variaveis exogenas normalizadas}
 
-\item{nlmod0}{Modelo ARIMAX original da etapa de treinamento}
+\item{nlmod0}{Modelo ARIMAX original}
 }
 \value{
 Objeto Arima recalibrado com variaveis exogenas
 }
 \description{
-Reajusta modelo ARIMAX mantendo a estrutura mas atualizando
-os coeficientes com dados mais recentes.
-}
-\details{
-Filtra registros completos (sem NA em nenhuma variavel) antes
-de recalibrar o modelo.
-}
-\seealso{
-\code{\link[forecast]{Arima}}
+Reajusta ARIMAX mantendo estrutura com dados atualizados.
 }
 \keyword{internal}

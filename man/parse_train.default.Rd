@@ -7,13 +7,13 @@
 \method{parse_train}{default}(modelo_parametros, ...)
 }
 \arguments{
-\item{modelo_parametros}{Lista com parametros do modelo}
+\item{modelo_parametros}{list, parametros do modelo}
 
 \item{...}{Argumentos adicionais (ignorados)}
 }
 \value{
-Gera erro indicando tipo de modelo desconhecido
+gera erro com tipo de modelo desconhecido
 }
 \description{
-Metodo default que gera erro para tipos de modelo nao suportados.
+Metodo Default para parse_train
 }

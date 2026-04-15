@@ -7,45 +7,18 @@
 \method{parse_train}{fisico_estimado}(modelo_parametros, ...)
 }
 \arguments{
-\item{modelo_parametros}{Lista com parametros do modelo:
-\describe{
-\item{n_dias_treino}{Numero de dias para janela de treinamento}
-\item{amos_min}{Numero minimo de amostras validas requeridas}
-}}
+\item{modelo_parametros}{Lista com \code{n_dias_treino} e \code{amos_min}}
 
-\item{...}{Argumentos adicionais:
-\describe{
-\item{pars}{Lista com combinacao de parametros (NWP, horizonte, meia-hora)}
-\item{ger_usi}{data.table com geracao observada}
-\item{prev_met_usi}{Lista de data.tables com previsoes meteorologicas}
-\item{data_fim_treino}{Data limite para dados de treinamento}
-}}
+\item{...}{Argumentos: \code{pars}, \code{ger_usi}, \code{prev_met_usi}, \code{data_fim_treino}}
 }
 \value{
-Lista contendo:
-\describe{
-\item{modelo_escolhido}{"RLS" ou "RLM"}
-\item{modelo_final}{Objeto lm ajustado}
-\item{variaveis_usadas}{Nomes das variaveis utilizadas no modelo}
-}
+Lista com \code{modelo_escolhido} ("RLS" ou "RLM"), \code{modelo_final}, \code{variaveis_usadas}
 }
 \description{
-Treina um modelo fisico-estimado baseado em regressao linear para previsao
-de geracao solar. Compara regressao linear simples (RLS) vs multipla (RLM).
+Treina modelo fisico-estimado baseado em regressao linear.
+Compara RLS (simples) vs RLM (multipla).
 }
 \details{
-O metodo executa:
-\enumerate{
-\item Filtra dados pela combinacao NWP × horizonte × meia-hora
-\item Elimina dados invalidos (NA, 999)
-\item Ajusta modelo RLS: geracao ~ irradiancia
-\item Ajusta modelo RLM: geracao ~ irradiancia + outras variaveis
-\item Seleciona melhor modelo por erro medio absoluto
-}
-
-Se coeficientes forem negativos ou dados insuficientes, a janela de
-treinamento e automaticamente expandida (ate +200 dias).
-}
-\seealso{
-\code{\link{aplica_regressao_linear}}
+Expande janela de treinamento (ate +200 dias) se coeficientes forem
+negativos ou dados insuficientes.
 }

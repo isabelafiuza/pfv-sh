@@ -7,18 +7,13 @@
 parse_train(modelo_parametros, ...)
 }
 \arguments{
-\item{modelo_parametros}{Lista com parametros do modelo, incluindo classe S3}
+\item{modelo_parametros}{list, parametros do modelo}
 
 \item{...}{Argumentos adicionais passados aos metodos especificos}
 }
 \value{
-Objeto do modelo treinado (tipo depende do metodo especifico)
+Objeto do modelo treinado
 }
 \description{
-Funcao generica S3 que despacha para o metodo especifico de treinamento
-baseado no tipo de modelo especificado.
-}
-\seealso{
-\code{\link{parse_train.arimax}} para treinamento ARIMAX
-\code{\link{parse_train.fisico_estimado}} para treinamento Fisico-Estimado
+Funcao generica S3 que despacha para metodo especifico de treinamento.
 }

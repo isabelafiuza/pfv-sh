@@ -7,16 +7,16 @@
 carrega_modelo_rds(modelo_previsao, id_usina, diretorio)
 }
 \arguments{
-\item{modelo_previsao}{Tipo do modelo ("arimax", "fisico_estimado")}
+\item{modelo_previsao}{character, tipo do modelo}
 
-\item{id_usina}{Identificador da usina}
+\item{id_usina}{character, identificador da usina}
 
-\item{diretorio}{Caminho para diretorio de artefatos}
+\item{diretorio}{character, caminho do diretorio}
 }
 \value{
 Objeto do modelo carregado
 }
 \description{
-Le arquivo RDS contendo modelo treinado para uma usina.
+Le arquivo RDS com modelo treinado.
 }
 \keyword{internal}

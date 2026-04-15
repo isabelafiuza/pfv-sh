@@ -1,23 +1,35 @@
 # pfv-sh
 
 [![R-CMD-check](https://github.com/isabelafiuza/pfv-sh/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/isabelafiuza/pfv-sh/actions/workflows/R-CMD-check.yaml)
+[![codecov](https://codecov.io/gh/isabelafiuza/pfv-sh/graph/badge.svg?token=TOKEN_AQUI)](https://codecov.io/gh/isabelafiuza/pfv-sh)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 **Modelo de Previsão de Geração Solar Fotovoltaica Semi-horária**
 
+Desenvolvido pelo [Operador Nacional do Sistema Elétrico (ONS)](https://www.ons.org.br/) para uso em previsão operacional de geração renovável.
+
 ---
 
-## 1. Visão Geral do Projeto
+## Visão Geral
 
 O `pfv-sh` é um pacote R para **previsão de geração solar fotovoltaica** com resolução semi-horária (30 minutos), desenvolvido para apoiar a programação da operação do Sistema Interligado Nacional (SIN) brasileiro.
 
-### Funcionalidades Principais
+Este pacote implementa um pipeline de treinamento e previsão que:
 
-- **Treinamento de modelos** de previsão de geração solar (ARIMAX, Físico-Estimado)
-- **Previsão operacional** com horizontes de D+0 a D+9
-- **Associação automática** de usinas às quadrículas dos modelos NWP
-- **Identificação de períodos de geração** solar por usina
-- **Interpolação temporal** de dados NWP para resolução semi-horária
+- **Treina modelos** de previsão de geração solar (ARIMAX, Físico-Estimado)
+- **Executa previsão operacional** com horizontes de D+0 a D+9
+- **Associa automaticamente** usinas às quadrículas dos modelos NWP
+- **Identifica períodos de geração** solar por usina
+- **Interpola temporalmente** dados NWP para resolução semi-horária
+- **Rastreia proveniência** com run IDs, checksums de configuração e checkpoints para retomada
+- **Coleta métricas** de desempenho por usina e gera relatórios de saúde do pipeline
+
+### Casos de Uso
+
+- Previsão operacional de geração solar para programação da operação do SIN
+- Treinamento de modelos de previsão semi-horária para usinas fotovoltaicas
+- Avaliação comparativa de modelos ARIMAX vs. Físico-Estimado
+- Análise de desempenho de usinas solares em diferentes horizontes de previsão
 
 ### Escopo e Limitações
 
@@ -31,7 +43,7 @@ O `pfv-sh` é um pacote R para **previsão de geração solar fotovoltaica** com
 
 ---
 
-## 2. Arquitetura do Sistema
+## Arquitetura
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -51,42 +63,53 @@ O `pfv-sh` é um pacote R para **previsão de geração solar fotovoltaica** com
 │  • Identificação de períodos com geração solar                              │
 └────────────────────────────────┬────────────────────────────────────────────┘
                                  │
-                                 ▼
+                 ┌───────────────┴────────────┐
+                 │                            │
+                 ▼                            ▼
+┌────────────────────────────────┐ ┌────────────────────────────────┐
+│     MODO: TRAIN (train_main)   │ │   MODO: PREDICT (predict_main) │
+│                                │ │                                │
+│  ARIMA/ARIMAX →                │ │  Pré-processamento NWP →       │
+│  Físico-Estimado →             │ │  Aplicação dos modelos →       │
+│  Artefato c/ metadados         │ │  Previsões de geração (MW)     │
+└────────────┬───────────────────┘ └────────────┬───────────────────┘
+             │                                  │
+             └──────────────┬───────────────────┘
+                            │
+                            ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                            MODELAGEM                                        │
-│  ┌─────────────────────────┐    ┌─────────────────────────┐                 │
-│  │       ARIMA/ARIMAX      │    │   Físico-Estimado       │                 │
-│  │  • auto.arima()         │    │  • Regressão Linear     │                 │
-│  │  • Variáveis exógenas   │    │    Simples (RLS)        │                 │
-│  │    (irradiância)        │    │  • Regressão Linear     │                 │
-│  │  • Seleção por desvio   │    │    Múltipla (RLM)       |                 |
-|  │    in-sample e AICc     |    │  • Seleção por desvio   │                 │
-│  │                         │    │    in-sample            │                 │
-│  └─────────────────────────┘    └─────────────────────────┘                 │
-│                                                                             │
-│  Treinamento: por usina × modelo NWP × horizonte × meia-hora                │
-└────────────────────────────────┬────────────────────────────────────────────┘
-                                 │
-                                 ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              SAÍDAS                                         │
-│  • Artefatos de modelo (.rds) - modo train                                  │
-│  • Previsões de geração (data.table) - modo predict                         │
-│    Colunas: id_modelo_prev, id_usina, id_modelo_nwp, data_hora_rodada,      │
-│             data_hora_previsao, valor                                       │
+│                         OBSERVABILIDADE                                     │
+│  Proveniência (JSON) │ Métricas (JSON) │ Relatório de Saúde (JSON)          │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
+### Componentes Principais
+
+| Módulo            | Descrição                                                       |
+| ----------------- | --------------------------------------------------------------- |
+| `cli.r`           | Entry point do pacote (`cli_main`), parsing de flags e env vars |
+| `config-file.r`   | Parsing e validação do arquivo de configuração                  |
+| `train.r`         | Pipeline de treinamento com suporte a paralelismo e retomada    |
+| `predict.r`       | Pipeline de previsão com suporte a paralelismo e retomada       |
+| `parallel.r`      | Gestão do backend paralelo (`future`/`future.apply`)            |
+| `artifact.r`      | Construção e validação de artefatos de modelo enriquecidos      |
+| `provenance.r`    | Rastreabilidade de execução, checkpoints e retomada             |
+| `metrics.r`       | Coleta de métricas por usina e agregados do pipeline            |
+| `health-report.r` | Classificação de saúde por usina e do pipeline                  |
+| `logging (zzz.r)` | Logging estruturado com contexto (run_id, mode)                 |
+| `utils.r`         | Funções auxiliares (interpolação, associação NWP-usina)         |
+| `combinacao.r`    | Combinação de previsões por modelo e horizonte                  |
+
 ---
 
-## 3. Início Rápido
+## Quick Start
 
-### 3.1 Pré-requisitos
+### Pré-requisitos
 
-- R ≥ 4.0
-- Dependências gerenciadas via `renv`
+- R >= 4.0
+- [renv](https://rstudio.github.io/renv/) para gerenciamento de dependências
 
-### 3.2 Instalação
+### Instalação
 
 ```bash
 # Instale o pacote usando remotes para desenvolvimento (branch main)
@@ -96,46 +119,82 @@ Rscript -e "remotes::install_github(\"isabelafiuza/pfv-sh\")"
 Rscript -e "remotes::install_github(\"isabelafiuza/pfv-sh@release\")"
 ```
 
-### 3.3 Execução via Docker
+### Execução Rápida
+
+```bash
+# 1. Prepare seus dados no diretório ./data (veja seção "Dados de Entrada")
+
+# 2. Configure o arquivo config.jsonc
+
+# 3. Execute o treinamento
+Rscript main.r --datadir ./data
+
+# 4. Altere mode para "predict" no config.jsonc e execute
+Rscript main.r --datadir ./data
+```
+
+### Execução com Paralelismo e Retomada
+
+```bash
+# Treinamento paralelo com 4 workers
+Rscript main.r --datadir ./data --parallel --workers 4
+
+# Retomada após falha (reprocessa apenas usinas pendentes)
+Rscript main.r --datadir ./data --parallel --resume
+```
+
+### Usando Docker
 
 ```bash
 # Build da imagem
 docker build -t pfv-sh .
 
-# Treinamento
-docker run -v $(pwd)/data:/app/data -v $(pwd)/out:/app/out pfv-sh
+# Execução com volumes montados
+docker run -v $(pwd)/data:/app/data -v $(pwd)/out:/app/out pfv-sh --datadir /app/data
 
-# Previsão (ajuste o config.jsonc para mode: "predict")
-docker run -v $(pwd)/data:/app/data -v $(pwd)/out:/app/out pfv-sh
-```
-
-### 3.4 Execução dos Testes
-
-```bash
-# Execute os testes unitários
-R -e "devtools::test()"
-
-# Ou via linha de comando
-Rscript -e "testthat::test_local()"
+# Execução paralela com variáveis de ambiente
+docker run \
+  -e PFVSH_PARALLEL=true \
+  -e PFVSH_WORKERS=4 \
+  -e PFVSH_RESUME=true \
+  -v $(pwd)/data:/app/data \
+  -v $(pwd)/out:/app/out \
+  pfv-sh --datadir /app/data
 ```
 
 ---
 
-## 4. Exemplos de Uso
+## Uso Detalhado
 
-### 4.1 Via Linha de Comando (CLI)
+### Linha de Comando
 
 ```bash
-# Usando diretório de dados padrão
-Rscript main.r --datadir ./data
-
-# Usando diretório customizado
-Rscript main.r --datadir /caminho/para/dados
+Rscript main.r --datadir <DIRETÓRIO> [--parallel] [--resume] [--workers N]
 ```
 
-### 4.2 Arquivo de Configuração
+| Argumento    | Descrição                                            | Default  |
+| ------------ | ---------------------------------------------------- | -------- |
+| `--datadir`  | Diretório contendo dados de entrada e `config.jsonc` | `./data` |
+| `--parallel` | Habilita processamento paralelo de usinas            | `FALSE`  |
+| `--resume`   | Retoma execução a partir do último checkpoint        | `FALSE`  |
+| `--workers`  | Número de workers paralelos (requer `--parallel`)    | auto     |
 
-O arquivo `config.jsonc` no diretório de dados controla a execução:
+### Variáveis de Ambiente
+
+| Variável          | Descrição                    | Valores                          |
+| ----------------- | ---------------------------- | -------------------------------- |
+| `LOG_LEVEL`       | Nível de log                 | `debug`, `info`, `warn`, `error` |
+| `PFVSH_PARALLEL`  | Habilita paralelismo via env | `true`/`false`                   |
+| `PFVSH_RESUME`    | Habilita retomada via env    | `true`/`false`                   |
+| `PFVSH_WORKERS`   | Número de workers via env    | inteiro positivo                 |
+
+A resolução de prioridade para flags é: **argumento CLI** > **variável de ambiente** > **valor padrão**.
+
+```bash
+LOG_LEVEL=debug Rscript main.r --datadir ./data
+```
+
+### Arquivo de Configuração (`config.jsonc`)
 
 ```jsonc
 {
@@ -182,17 +241,7 @@ O arquivo `config.jsonc` no diretório de dados controla a execução:
 }
 ```
 
-### 4.3 Variáveis de Ambiente
-
-| Variável    | Descrição    | Valores                          |
-| ----------- | ------------ | -------------------------------- |
-| `LOG_LEVEL` | Nível de log | `debug`, `info`, `warn`, `error` |
-
-```bash
-LOG_LEVEL=debug Rscript main.r --datadir ./data
-```
-
-### 4.4 Uso Programático em R
+### Uso Programático em R
 
 ```r
 library(pfvsh)
@@ -219,9 +268,7 @@ if (config$mode == "predict") {
 
 ---
 
-## 5. Estrutura dos Dados
-
-### 5.1 Dados de Entrada
+## Dados de Entrada
 
 O diretório de dados deve conter os seguintes arquivos:
 
@@ -232,46 +279,69 @@ O diretório de dados deve conter os seguintes arquivos:
 | `geracao_observada.parquet`    | Parquet ou CSV | Série temporal de geração por fonte           |
 | `irradiancia_prevista.parquet` | Parquet ou CSV | Previsões NWP de irradiância                  |
 
-#### Schemas de Dados
+### Schemas de Dados
 
-##### `usinas.parquet`
+#### `usinas.parquet`
 
 ```
 id_usina,latitude,longitude,capacidade_instalada_MW,data_inicio_operacao_comercial
 USINA_A,-23.5505,-46.6333,100.0,2020-01-01 12:00:00
 ```
 
-##### `geracao_observada.parquet`
+#### `geracao_observada.parquet`
 
 ```
 id_fonte_observacao,id_usina,data_hora_observacao,valor,status
 PI,USINA_A,2024-01-01 00:00:00,45.2,0
 ```
 
-##### `irradiancia_prevista.parquet`
+#### `irradiancia_prevista.parquet`
 
 ```
 id_modelo_nwp,latitude,longitude,data_hora_rodada,data_hora_previsao,valor
 GFS,-23.5,-46.5,2024-01-01 00:00:00,2024-01-01 12:00:00,850.5
 ```
 
-### 5.2 Dados de Saída
+---
+
+## Saídas
+
+### Dados de Resultado
 
 **Modo Train:**
 
-- `{id_usina}_modelos_ajustados.rds`: Artefatos dos modelos treinados
+| Arquivo                        | Descrição                          |
+| ------------------------------ | ---------------------------------- |
+| `{id_usina}_modelos_ajustados.rds` | Artefato de modelo com metadados |
 
 **Modo Predict:**
 
-- `data.table` com colunas:
-  - `id_modelo_prev`: Tipo do modelo (arimax, fisico_estimado)
-  - `id_usina`: Identificador da usina
-  - `id_modelo_nwp`: Modelo NWP utilizado
-  - `data_hora_rodada`: Data/hora da rodada
-  - `data_hora_previsao`: Data/hora da previsão
-  - `valor`: Geração prevista (MW)
+`data.table` com as seguintes colunas:
 
-### 5.3 Convenções Temporais
+| Coluna               | Descrição                        |
+| -------------------- | -------------------------------- |
+| `id_modelo_prev`     | Tipo do modelo (arimax, fisico_estimado) |
+| `id_usina`           | Identificador da usina           |
+| `id_modelo_nwp`      | Modelo NWP utilizado             |
+| `data_hora_rodada`   | Data/hora da rodada              |
+| `data_hora_previsao` | Data/hora da previsão            |
+| `valor`              | Geração prevista (MW)            |
+
+### Artefatos de Observabilidade
+
+Cada execução do pipeline produz adicionalmente os seguintes artefatos. Em modo train são gravados no diretório `artifact`; em modo predict, no diretório `output`.
+
+| Arquivo                            | Descrição                                                                 |
+| ---------------------------------- | ------------------------------------------------------------------------- |
+| `{id_usina}_modelos_ajustados.rds` | Artefato de modelo com metadados — modo train (no dir artifact)           |
+| `provenance-{run_id}.json`         | Registro de proveniência com status por usina e timestamps                |
+| `metrics-{run_id}.json`            | Métricas por usina (duração, volume de dados, qualidade do modelo)        |
+| `health-{run_id}.json`             | Relatório de saúde (healthy/degraded/failed) com avisos e erros           |
+| `checkpoint-{run_id}.json`         | Checkpoint para retomada (removido após conclusão bem-sucedida)           |
+
+---
+
+## Convenções Temporais
 
 - **Fuso horário**: UTC
 - **Resolução**: Semi-horária (30 minutos)
@@ -280,9 +350,9 @@ GFS,-23.5,-46.5,2024-01-01 00:00:00,2024-01-01 12:00:00,850.5
 
 ---
 
-## 6. Modelos de Previsão
+## Modelos de Previsão
 
-### 6.1 ARIMA/ARIMAX
+### ARIMA/ARIMAX
 
 Modelo auto-regressivo integrado de média móvel:
 
@@ -291,7 +361,7 @@ Modelo auto-regressivo integrado de média móvel:
 - **Seleção automática**: `auto.arima()` do pacote `forecast`
 - **Critério de seleção**: AICc + erro médio absoluto
 
-### 6.2 Físico-Estimado
+### Físico-Estimado
 
 Modelo baseado em regressão linear:
 
@@ -301,15 +371,54 @@ Modelo baseado em regressão linear:
 
 ---
 
+## Metodologia
+
+### Retomada de Execução
+
+Quando `--resume` está habilitado:
+
+1. O pipeline verifica checkpoints existentes no diretório de saída
+2. Valida o hash da configuração (rejeita checkpoints de configurações diferentes)
+3. Reprocessa apenas usinas pendentes, carregando resultados intermediários do disco
+4. Remove checkpoints e resultados intermediários após conclusão bem-sucedida
+
 ---
 
-## 8. Licença
+## Testes
 
-Este projeto está licenciado sob a licença MIT. Veja [LICENSE](LICENSE) para detalhes.
+```bash
+# Executar testes unitários
+Rscript -e "devtools::test()"
+
+# Verificação completa do pacote
+Rscript -e "devtools::check()"
+
+# Linting (inclui complexidade ciclomática)
+Rscript -e "lintr::lint_package()"
+
+# Cobertura de testes
+Rscript -e "covr::package_coverage()"
+```
 
 ---
 
-## 📚 Documentação Adicional
+## Contribuindo
+
+Contribuições são bem-vindas! Por favor, leia o [CONTRIBUTING.md](CONTRIBUTING.md) para detalhes sobre:
+
+- Configuração do ambiente de desenvolvimento
+- Padrões de código e estilo
+- Processo de submissão de Pull Requests
+
+---
+
+## Licença
+
+Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE](LICENSE) para detalhes.
+
+---
+
+## Documentação Adicional
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) - Detalhes da arquitetura da aplicação
 - [CONTRIBUTING.md](CONTRIBUTING.md) - Diretrizes para contribuição
@@ -317,7 +426,7 @@ Este projeto está licenciado sob a licença MIT. Veja [LICENSE](LICENSE) para d
 
 ---
 
-## 📞 Contato
+## Contato
 
 - **Organização**: [ONS - Operador Nacional do Sistema Elétrico](https://www.ons.org.br/)
 - **Issues**: [GitHub Issues](https://github.com/isabelafiuza/pfv-sh/issues)
@@ -325,11 +434,11 @@ Este projeto está licenciado sob a licença MIT. Veja [LICENSE](LICENSE) para d
 ## Citação
 
 ```bibtex
-@software{mhpfv2025,
+@software{pfvsh2025,
   author = {{ONS - Operador Nacional do Sistema Elétrico}},
   title = {pfv-sh: Modelo de Previsão de Geração Solar Fotovoltaica Semi-horária},
   year = {2025},
   url = {https://github.com/isabelafiuza/pfv-sh},
-  version = {0.1.0}
+  version = {0.2.0}
 }
 ```

@@ -7,39 +7,13 @@
 \method{parse_predict}{arimax}(modelo, ...)
 }
 \arguments{
-\item{modelo}{Lista contendo:
-\describe{
-\item{modelo_escolhido}{"ARIMA" ou "ARIMAX"}
-\item{modelo_final}{Objeto Arima ajustado}
-}}
+\item{modelo}{list com \code{modelo_escolhido} ("ARIMA" ou "ARIMAX"), \code{modelo_final}}
 
-\item{...}{Argumentos adicionais:
-\describe{
-\item{pars}{Combinacao de parametros (NWP, horizonte, meia-hora)}
-\item{data_prev}{Vetor de datas-alvo}
-\item{ger_usi}{data.table com geracao observada}
-\item{prev_met_usi}{Lista de previsoes meteorologicas}
-\item{modelo_parametros}{Parametros do modelo}
-\item{v_horizonte}{Vetor de horizontes}
-}}
+\item{...}{Argumentos: \code{pars}, \code{data_prev}, \code{ger_usi}, \code{prev_met_usi}, \code{modelo_parametros}, \code{v_horizonte}}
 }
 \value{
-Vetor numerico com valores previstos (MW), ou NA se dados insuficientes
+Vetor numerico com valores previstos (MW); NA se dados insuficientes
 }
 \description{
-Gera previsoes usando modelo ARIMA/ARIMAX previamente treinado.
-O modelo e recalibrado com os dados mais recentes antes da previsao.
-}
-\details{
-O metodo:
-\enumerate{
-\item Separa dados em treino e previsao
-\item Normaliza variaveis usando estatisticas do treino
-\item Recalibra modelo com dados mais recentes
-\item Gera previsao para horizonte especificado
-\item Desnormaliza resultado para escala original
-}
-}
-\seealso{
-\code{\link{recalibra_arimax}}, \code{\link{desnormaliza_variaveis}}
+Gera previsoes usando modelo ARIMA/ARIMAX recalibrado.
 }

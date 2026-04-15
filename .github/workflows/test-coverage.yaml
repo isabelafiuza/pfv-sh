@@ -2,11 +2,15 @@ name: Test-Coverage
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   pull_request:
-    branches: [main]
+    branches: [main, develop]
 
 permissions: read-all
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
@@ -14,6 +18,7 @@ jobs:
 
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      ARROW_WITH_ZSTD: "ON"
 
     steps:
       - name: Checkout repository
@@ -28,7 +33,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libcurl4-openssl-dev libssl-dev libxml2-dev
+          sudo apt-get install -y libcurl4-openssl-dev libssl-dev libxml2-dev libzstd-dev
 
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
@@ -44,6 +49,11 @@ jobs:
           )
           print(cov)
           covr::to_cobertura(cov)
+          pct <- covr::percent_coverage(cov)
+          cat(sprintf("Overall coverage: %.1f%%\n", pct))
+          if (pct < 75) {
+              stop(sprintf("Coverage %.1f%% is below minimum threshold of 75%%", pct))
+          }
         shell: Rscript {0}
 
       - uses: codecov/codecov-action@v5

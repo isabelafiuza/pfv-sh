@@ -9,20 +9,12 @@ recalibra_arima(dt, nlmod0)
 \arguments{
 \item{dt}{data.table com coluna \code{ger_obs_norm} (geracao normalizada)}
 
-\item{nlmod0}{Modelo ARIMA original da etapa de treinamento}
+\item{nlmod0}{Modelo ARIMA original}
 }
 \value{
 Objeto Arima recalibrado
 }
 \description{
-Reajusta modelo ARIMA mantendo a estrutura (p, d, q) mas atualizando
-os coeficientes com dados mais recentes.
-}
-\details{
-Usa \code{Arima(..., model = nlmod0)} para manter a estrutura
-do modelo original enquanto atualiza os parametros.
-}
-\seealso{
-\code{\link[forecast]{Arima}}
+Reajusta ARIMA mantendo estrutura (p,d,q) com dados atualizados.
 }
 \keyword{internal}

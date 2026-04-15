@@ -7,27 +7,14 @@
 desnormaliza_variaveis(dt, stats_norm)
 }
 \arguments{
-\item{dt}{data.table com colunas normalizadas (sufixo \code{_norm})}
+\item{dt}{data.table com colunas normalizadas (sufixo \verb{_norm})}
 
-\item{stats_norm}{data.table com estatisticas de normalizacao:
-\describe{
-\item{variavel}{Nome da variavel original}
-\item{med}{Media usada na normalizacao}
-\item{sd}{Desvio padrao usado na normalizacao}
-}}
+\item{stats_norm}{data.table com \code{variavel}, \code{med}, \code{sd}}
 }
 \value{
-data.table com colunas desnormalizadas (sem sufixo \code{_norm})
+data.table desnormalizado (sem sufixo \verb{_norm})
 }
 \description{
-Reverte a normalizacao z-score aplicada as previsoes,
-retornando valores a escala original.
-}
-\details{
-Aplica a transformacao inversa:
-\deqn{X = X_{norm} \times \sigma_X + \bar{X}}
-}
-\seealso{
-\code{\link{normaliza_variaveis}}
+Reverte normalizacao z-score, retornando valores a escala original.
 }
 \keyword{internal}
