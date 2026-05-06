@@ -282,7 +282,7 @@ parse_train.default <- function(modelo_parametros, ...) {
 #' @param modelo_parametros Lista com `n_dias_treino` e `amos_min`
 #' @param ... Argumentos: `pars`, `ger_usi`, `prev_met_usi`, `data_fim_treino`
 #'
-#' @return Lista com `modelo_escolhido` ("RLS" ou "RLM"), `modelo_final`, `variaveis_usadas`
+#' @return Lista com `modelo_escolhido` ("RLS", "RLM" ou "fallback"), `modelo_final`, `variaveis_usadas`
 #'
 #' @details
 #' Expande janela de treinamento (ate +200 dias) se coeficientes forem
@@ -343,6 +343,7 @@ ajusta_modelo_fallback <- function(dt_treino_filt) {
     dt_x <- data.table(irrad_prev = rep(0, nrow(dt_treino_filt)))
     nlmod0 <- aplica_regressao_linear(dt_y = dt_y, dt_x = dt_x)
     nlmod0$coefficients[is.na(nlmod0$coefficients)] <- 0
+    attr(nlmod0, "is_fallback") <- TRUE
     nlmod0
 }
 
@@ -405,7 +406,7 @@ aplica_regressao_linear <- function(dt_y, dt_x, nlmod0 = NULL) {
 #' @param modelo_parametros Lista com `n_dias_treino` e `amos_min`
 #' @param ... Argumentos: `pars`, `ger_usi`, `prev_met_usi`, `data_fim_treino`
 #'
-#' @return Lista com `modelo_escolhido` ("ARIMA" ou "ARIMAX"), `modelo_final`
+#' @return Lista com `modelo_escolhido` ("ARIMA", "ARIMAX" ou "fallback"), `modelo_final`
 #'
 #' @details
 #' Seleciona melhor modelo por AICc + erro medio absoluto.
@@ -446,7 +447,10 @@ parse_train.arimax <- function(modelo_parametros, ...) {
         erros <- calcula_erros(dt_treino_norm, nlmod1, nlmod2)
         seleciona_modelo(nlmod1, nlmod2, erros)
     } else {
-        nlmod0
+        list(
+        modelo_escolhido = "fallback",
+        modelo_final = nlmod0
+        )
     }
 }
 
@@ -613,7 +617,9 @@ dados_suficientes <- function(dt, num_min_dados) {
 #'
 #' @keywords internal
 ajusta_dummy <- function(dt) {
-    auto.arima(rep(0, nrow(dt)), allowdrift = FALSE, allowmean = FALSE)
+    nlmod0 <- auto.arima(rep(0, nrow(dt)), allowdrift = FALSE, allowmean = FALSE)
+    attr(nlmod0, "is_fallback") <- TRUE
+    nlmod0
 }
 
 #' Normaliza Variaveis (Z-Score)
@@ -750,12 +756,16 @@ calcula_erros_fisico_estimado <- function(dt, nlmod1, nlmod2) {
 #' @param nlmod2 Modelo ARIMAX.
 #' @param erros Lista com erros medios dos modelos.
 #'
-#' @return Lista com modelo escolhido.
+#' @return Lista com `modelo_escolhido` ("ARIMA", "ARIMAX" ou "fallback") e `modelo_final`.
 seleciona_modelo <- function(nlmod1, nlmod2, erros) {
     escolhe_arima <- (nlmod1$aicc <= nlmod2$aicc) && (erros$erro1 <= erros$erro2)
+    nlmod_final <- if (escolhe_arima) nlmod1 else nlmod2
+    if (isTRUE(attr(nlmod_final, "is_fallback"))) {
+        return(list(modelo_escolhido = "fallback", modelo_final = nlmod_final))
+    }
     list(
         modelo_escolhido = if (escolhe_arima) "ARIMA" else "ARIMAX",
-        modelo_final = if (escolhe_arima) nlmod1 else nlmod2
+        modelo_final = nlmod_final
     )
 }
 
@@ -765,12 +775,21 @@ seleciona_modelo <- function(nlmod1, nlmod2, erros) {
 #' @param nlmod2 Modelo RLM
 #' @param erros Lista com erros medios dos modelos.
 #'
-#' @return Lista com modelo escolhido.
+#' @return Lista com `modelo_escolhido` ("RLS", "RLM" ou "fallback"), `modelo_final` e `variaveis_usadas`.
 seleciona_modelo_fisico_estimado <- function(nlmod1, nlmod2, erros) {
     escolhe_fe <- (erros$erro1 <= erros$erro2)
+    nlmod_final <- if (escolhe_fe) nlmod1 else nlmod2
+    variaveis_usadas <- if (escolhe_fe) names(nlmod1$model) else names(nlmod2$model)
+    if (isTRUE(attr(nlmod_final, "is_fallback"))) {
+        return(list(
+            modelo_escolhido = "fallback",
+            modelo_final = nlmod_final,
+            variaveis_usadas = variaveis_usadas
+        ))
+    }
     list(
         modelo_escolhido = if (escolhe_fe) "RLS" else "RLM",
-        modelo_final = if (escolhe_fe) nlmod1 else nlmod2,
-        variaveis_usadas = if (escolhe_fe) names(nlmod1$model) else names(nlmod2$model) # ISABELA - ARRUMAR
+        modelo_final = nlmod_final,
+        variaveis_usadas = variaveis_usadas
     )
 }

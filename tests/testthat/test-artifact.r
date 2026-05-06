@@ -16,7 +16,7 @@ make_model_entry <- function(escolhido = "arimax") {
 
 make_models_list <- function(n = 2L, n_dummy = 0L) {
     valid <- replicate(n, make_model_entry("arimax"), simplify = FALSE)
-    dummy <- replicate(n_dummy, make_model_entry("ARIMA(0,0,0)"), simplify = FALSE)
+    dummy <- replicate(n_dummy, make_model_entry("fallback"), simplify = FALSE)
     c(valid, dummy)
 }
 
@@ -113,7 +113,7 @@ test_that("count_valid_models counts non-dummy models", {
     expect_equal(count_valid_models(models), 3L)
 })
 
-test_that("count_valid_models excludes ARIMA(0,0,0) entries", {
+test_that("count_valid_models excludes fallback entries", {
     models <- make_models_list(n = 2L, n_dummy = 3L)
 
     expect_equal(count_valid_models(models), 2L)
