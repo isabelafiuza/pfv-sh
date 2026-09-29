@@ -393,13 +393,15 @@ parse_predict.default <- function(modelo, ...) {
 #'
 #' Gera previsoes usando modelo ARIMA/ARIMAX recalibrado.
 #'
-#' @param modelo list com `modelo_escolhido` ("ARIMA" ou "ARIMAX"), `modelo_final`
+#' @param modelo list com `modelo_escolhido` ("ARIMA", "ARIMAX" ou "fallback"), `modelo_final`
 #' @param ... Argumentos: `pars`, `data_prev`, `ger_usi`, `prev_met_usi`, `modelo_parametros`, `v_horizonte`
 #'
-#' @return Vetor numerico com valores previstos (MW); NA se dados insuficientes
+#' @return Vetor numerico com valores previstos (MW); NA se dados insuficientes ou modelo fallback
 #'
 #' @export
 parse_predict.arimax <- function(modelo, ...) {
+    if (identical(modelo$modelo_escolhido, "fallback")) return(NA_real_)
+
     args <- list(...)
     pars <- args$pars
     data_prev <- args$data_prev
@@ -471,13 +473,15 @@ parse_predict.arimax <- function(modelo, ...) {
 #'
 #' Gera previsoes usando modelo de regressao linear (RLS ou RLM).
 #'
-#' @param modelo list com `modelo_escolhido` ("RLS" ou "RLM"), `modelo_final`, `variaveis_usadas`
+#' @param modelo list com `modelo_escolhido` ("RLS", "RLM" ou "fallback"), `modelo_final`, `variaveis_usadas`
 #' @param ... Argumentos: `pars`, `prev_met_usi`, `ger_usi`, `v_horizonte`, `data_prev`
 #'
-#' @return Vetor numerico com valores previstos (MW)
+#' @return Vetor numerico com valores previstos (MW); NA se modelo fallback
 #'
 #' @export
 parse_predict.fisico_estimado <- function(modelo, ...) {
+    if (identical(modelo$modelo_escolhido, "fallback")) return(NA_real_)
+
     args <- list(...)
     pars <- args$pars
     prev_met_usi <- args$prev_met_usi

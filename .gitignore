@@ -51,3 +51,7 @@ rsconnect/
 plans/
 
 .claude/
+
+# Output files
+data/artifact/
+data/out/

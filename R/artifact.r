@@ -100,7 +100,7 @@ validate_artifact <- function(artifact) {
 #' @keywords internal
 count_valid_models <- function(models) {
     sum(vapply(models, function(m) {
-        !identical(m$modelo$modelo_escolhido, "ARIMA(0,0,0)")
+        !identical(m$modelo$modelo_escolhido, "fallback")
     }, logical(1L)))
 }
 
