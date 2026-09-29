@@ -539,6 +539,6 @@ completa_datas <- function(dt, discretizacao) {
 get_dataset <- function(args, conn) {
     list(
         ger_obs = get_geracao_observada(conn, id_usina = args$ids_usinas),
-        irrad_prev = get_irradiancia_prevista(conn, id_usina = args$ids_usinas, id_modelo_nwp = args$modelos_NWP)
+        irrad_prev = get_irradiancia_prevista(conn, id_modelo_nwp = args$modelos_NWP)
     )
 }
