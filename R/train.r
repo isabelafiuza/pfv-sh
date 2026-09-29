@@ -448,8 +448,8 @@ parse_train.arimax <- function(modelo_parametros, ...) {
         seleciona_modelo(nlmod1, nlmod2, erros)
     } else {
         list(
-        modelo_escolhido = "fallback",
-        modelo_final = nlmod0
+            modelo_escolhido = "fallback",
+            modelo_final = nlmod0
         )
     }
 }
