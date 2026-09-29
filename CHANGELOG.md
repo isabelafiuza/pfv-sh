@@ -7,6 +7,17 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ---
 
+## [Unreleased]
+
+### Changed
+
+- A previsão combinada (`combina_media`) passa a ser a média entre todos os modelos de previsão
+  **e** todos os modelos NWP, gerando uma única série por usina, rodada e horário. Na saída, as
+  linhas combinadas passam a ter `id_modelo_nwp = "combinado"` (antes havia um combinado por
+  modelo NWP, com o nome do NWP em `id_modelo_nwp`).
+
+---
+
 ## [0.2.0] - 2026-04-15
 
 ### Added

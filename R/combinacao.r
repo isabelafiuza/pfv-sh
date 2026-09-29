@@ -4,8 +4,8 @@ combina_media <- function(dt) {
     colorder <- names(dt)
     prev_combinada <- dt[
         ,
-        .(id_modelo_prev = "combinado", valor = mean(valor, na.rm = TRUE)),
-        by = .(id_usina, id_modelo_nwp, data_hora_rodada, data_hora_previsao)
+        .(id_modelo_prev = "combinado", id_modelo_nwp = "combinado", valor = mean(valor, na.rm = TRUE)),
+        by = .(id_usina, data_hora_rodada, data_hora_previsao)
     ]
     prev_combinada[is.nan(valor), valor := NA]
     prev_combinada[, dia_previsao := as.Date(data_hora_previsao)]

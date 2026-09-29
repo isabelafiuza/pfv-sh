@@ -50,7 +50,7 @@ test_that("combina_media", {
         expect_gt(nrow(result), nrow(dt))
     })
 
-    test_that("combina_media adds one combinado group per usina x nwp x rodada x timestamp", {
+    test_that("combina_media adds one combinado group per usina x rodada x timestamp", {
         dt <- make_prev_dt(ids_usina = c("USI1"), ids_nwp = c("GFS"), n_modelos_prev = 3L)
         n_input_rows <- nrow(dt)
 
@@ -82,6 +82,21 @@ test_that("combina_media", {
             expect_true(all(abs(day_rows$valor - 15.0) < 1.0))
         }
         expect_true(nrow(combinado_rows) > 0L)
+    })
+
+    test_that("combina_media averages across all prev and nwp models", {
+        dt <- make_prev_dt(ids_usina = "USI1", ids_nwp = c("GFS", "ECMWF"), n_modelos_prev = 2L)
+        dt[id_modelo_prev == "modelo_1" & id_modelo_nwp == "GFS", valor := 10.0]
+        dt[id_modelo_prev == "modelo_2" & id_modelo_nwp == "GFS", valor := 20.0]
+        dt[id_modelo_prev == "modelo_1" & id_modelo_nwp == "ECMWF", valor := 30.0]
+        dt[id_modelo_prev == "modelo_2" & id_modelo_nwp == "ECMWF", valor := 40.0]
+
+        result <- f(dt)
+        combinado_rows <- result[id_modelo_prev == "combinado"]
+
+        expect_true(all(combinado_rows$id_modelo_nwp == "combinado"))
+        expect_equal(nrow(combinado_rows), data.table::uniqueN(dt$data_hora_previsao))
+        expect_true(all(abs(combinado_rows$valor - 25.0) < 1.0))
     })
 
     test_that("combina_media preserves original column structure in output", {
